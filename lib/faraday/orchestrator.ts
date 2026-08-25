@@ -5,7 +5,7 @@ import { faradayAgent, faradayRunner } from './agent';
 import { startPublicationBroker, type PublicationBroker } from './broker';
 import { resolveCommentInput } from './comment-input';
 import { getGitHubConfig } from './config';
-import { parseReproductionEvidence, validateReport } from './evidence';
+import { classifyBoundedToolOutput, parseReproductionEvidence, validateReport } from './evidence';
 import { createEventFactory, type FaradayEvent, type RunRequest } from './events';
 import { loadFixtures } from './fixtures';
 import { GitHubAdapter } from './github';
@@ -79,8 +79,15 @@ export async function executeLive(request: RunRequest, emit: Emit, disconnectSig
     });
     let observedUpdates = 0;
     for await (const sdkEvent of stream) {
-      if (sdkEvent.type === 'agent_updated_stream_event' && observedUpdates++ < 6) {
-        await emit(event('agent.step', { label: 'Agent advanced to the next bounded triage step' }));
+      if (sdkEvent.type !== 'run_item_stream_event' || observedUpdates++ >= 12) continue;
+      if (sdkEvent.name === 'tool_called') {
+        const tool = sdkEvent.item.type === 'tool_call_item' ? sdkEvent.item.toolName : null;
+        await emit(event('agent.step', { label: tool ? `Agent invoked bounded ${tool}` : 'Agent invoked a bounded workspace tool' }));
+      } else if (sdkEvent.name === 'tool_output') {
+        const output = sdkEvent.item.type === 'tool_call_output_item' ? sdkEvent.item.output : null;
+        await emit(event('agent.step', { label: classifyBoundedToolOutput(output) }));
+      } else if (sdkEvent.name === 'message_output_created') {
+        await emit(event('agent.step', { label: 'Agent emitted a bounded progress update' }));
       }
     }
     await stream.completed;

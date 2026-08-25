@@ -1,11 +1,21 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { Editor, Tool } from '@openai/agents';
-import { configureFaradayFilesystem, configureFaradayShell, createFaradayReportEditor, isAllowedFaradayCommand } from '@/lib/faraday/agent-policy';
+import { faradayAgent } from '@/lib/faraday/agent';
+import { configureFaradayFilesystem, configureFaradayShell, createFaradayReportEditor, faradayCommandRejectionReason, isAllowedFaradayCommand } from '@/lib/faraday/agent-policy';
 
 describe('Faraday shell policy', () => {
+  it('forces the first bounded command and documents the exact safe command shape', () => {
+    expect(faradayAgent.modelSettings).toMatchObject({ toolChoice: 'exec_command', parallelToolCalls: false });
+    expect(faradayAgent.instructions).toEqual(expect.stringContaining('{"cmd":"node repro.mjs"}'));
+    expect(faradayAgent.instructions).toEqual(expect.stringContaining('only `/workspace` is allowed'));
+    expect(faradayAgent.instructions).toEqual(expect.stringContaining('only `/bin/bash` or `/bin/sh` is allowed'));
+  });
+
   it('allows only the two fixed workspace commands', () => {
     expect(isAllowedFaradayCommand({ cmd: "sed -n '1,200p' issue.md" })).toBe(true);
     expect(isAllowedFaradayCommand({ cmd: 'node repro.mjs', workdir: '.', max_output_tokens: 4_000 })).toBe(true);
+    expect(isAllowedFaradayCommand({ cmd: 'node repro.mjs', workdir: '/workspace' })).toBe(true);
+    expect(isAllowedFaradayCommand({ cmd: 'node repro.mjs', shell: '/bin/bash' })).toBe(true);
   });
 
   it.each([
@@ -15,9 +25,16 @@ describe('Faraday shell policy', () => {
     { cmd: 'node repro.mjs', workdir: '..' },
     { cmd: 'node repro.mjs', shell: '/bin/zsh' },
     { cmd: 'node repro.mjs', tty: true },
-    { cmd: 'node repro.mjs', max_output_tokens: 4_001 },
+    { cmd: 'node repro.mjs', max_output_tokens: 0 },
   ])('rejects host or command-surface expansion: %j', (input) => {
     expect(isAllowedFaradayCommand(input)).toBe(false);
+  });
+
+  it('returns bounded policy feedback without echoing rejected arguments', () => {
+    const reason = faradayCommandRejectionReason({ cmd: 'cat sensitive-file', workdir: '/private' });
+    expect(reason).toBe('Faraday command policy: command must exactly match one fixed fixture command.');
+    expect(reason).not.toContain('cat sensitive-file');
+    expect(reason).not.toContain('/private');
   });
 
   it('removes interactive shell and non-writing filesystem tools', () => {
