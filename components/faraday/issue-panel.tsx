@@ -19,28 +19,31 @@ export function IssuePanel({ input, url, loading, error, disabled, onUrlChange, 
         <div className="warning-mark" aria-hidden="true">!</div>
         <div>
           <p className="section-index">UNTRUSTED INPUT</p>
-          <h1 id="input-title">GitHub issue comment</h1>
-          <p>Paste a public issue-comment link. Faraday loads it without credentials and gives the same bounded text to both agents.</p>
+          <h1 id="input-title">GitHub issue or comment</h1>
+          <p>Replay starts with a real public prompt-injection case. You can load another public issue or issue-comment without credentials.</p>
         </div>
-        <span className={`input-source ${input?.source || 'fixture'}`}>{input?.source === 'github' ? 'PUBLIC GITHUB' : 'DEMO FIXTURE'}</span>
+        <span className={`input-source ${input?.source || 'fixture'}`}>{input?.source === 'github' ? 'PUBLIC GITHUB' : 'PUBLIC CASE REPLAY'}</span>
       </div>
 
       <div className="comment-loader">
-        <label htmlFor="comment-url">Public GitHub comment URL</label>
+        <label htmlFor="comment-url">Public GitHub issue or comment URL</label>
         <div>
           <input id="comment-url" type="url" value={url} disabled={disabled || loading} onChange={(event) => onUrlChange(event.target.value)} placeholder="https://github.com/owner/repo/issues/184#issuecomment-123456" autoComplete="off" spellCheck={false} />
-          <button type="button" onClick={onLoad} disabled={disabled || loading || !url.trim()}>{loading ? 'Loading…' : 'Load comment'}</button>
+          <button type="button" onClick={onLoad} disabled={disabled || loading || !url.trim()}>{loading ? 'Loading…' : 'Load input'}</button>
         </div>
-        {error ? <p className="input-error" role="alert">{error}</p> : <p className="input-help">Public comments only · 6 KiB maximum · no GitHub token used for loading</p>}
+        {error ? <p className="input-error" role="alert">{error}</p> : <p className="input-help">Public issues and comments only · 6 KiB maximum · no GitHub token used for loading</p>}
       </div>
 
       {input ? (
         <article className="comment-preview">
-          <div className="comment-meta"><span>{input.repository}{input.issueNumber ? ` #${input.issueNumber}` : ''}</span><span>@{input.author}</span><span>INPUT MATCH · {shortFingerprint}</span></div>
+          <div className="comment-meta"><span>{input.repository}{input.issueNumber ? ` #${input.issueNumber}` : ''} · {input.title}</span><span>@{input.author}</span><span>INPUT MATCH · {shortFingerprint}</span></div>
           <p>{input.body}</p>
           <div className="comment-actions">
-            {input.url ? <a href={input.url} target="_blank" rel="noreferrer">Open source comment ↗</a> : <span>Included demo-safe injection</span>}
-            {input.source === 'github' ? <button type="button" onClick={onUseFixture} disabled={disabled}>Use included fixture</button> : null}
+            <div className="source-links">
+              {input.url ? <a href={input.url} target="_blank" rel="noreferrer">Open source {input.kind} ↗</a> : null}
+              {input.referenceOutcomeUrl ? <a href={input.referenceOutcomeUrl} target="_blank" rel="noreferrer">Historical outcome PR ↗</a> : null}
+            </div>
+            {input.source === 'github' ? <button type="button" onClick={onUseFixture} disabled={disabled}>Restore replay case</button> : <span>Bundled metadata · no load required</span>}
           </div>
         </article>
       ) : null}

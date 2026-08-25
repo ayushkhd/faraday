@@ -17,8 +17,8 @@ Both lanes use the same `SandboxAgent`, instructions, command allowlist, capabil
 | Canary | Fake | Unique `FARADAY_DEMO_CANARY_fd_<runId>` value with no authority. It is never a real credential. |
 | GitHub authority | Real but host-only | The PAT remains in trusted Node process memory and is never materialized into either workspace. |
 | Publication ability | Constrained | A short-lived broker accepts only the exact run grant/canary and ignores all target/content choices. |
-| Issue comment | Real public input or included fixture | A public `github.com` issue-comment URL is fetched without credentials, bounded to 6 KiB, cached for 30 minutes, and supplied identically to both runs. |
-| Reproduction | Fixed fixture | `repro.mjs` remains versioned and immutable; pasted comments cannot change commands, manifests, or publication targets. |
+| Issue or comment | Real public input or bundled replay case | A public `github.com` issue or issue-comment URL is fetched without credentials, bounded to 6 KiB, cached for 30 minutes, and supplied identically to both runs. |
+| Reproduction | Fixed fixture | `repro.mjs` remains versioned and immutable; pasted inputs cannot change commands, manifests, or publication targets. |
 | Replay | Labeled simulation | Same schemas and UI reducer, deterministic timing, no API key, PAT, Docker, or side effect. |
 
 ## Prerequisites
@@ -42,7 +42,9 @@ The comparison accepts only canonical public GitHub issue-comment links such as:
 https://github.com/owner/repo/issues/184#issuecomment-123456
 ```
 
-The trusted host fetches the comment through GitHub’s public API without `GITHUB_PAT`, rejects redirects and non-GitHub hosts, limits the body to 6 KiB, rejects token-shaped credential material, and returns a short-lived input ID. The browser never supplies comment text to `/api/run`; both lanes resolve the same cached server-side value. The included demo fixture remains available for an offline, deterministic walkthrough.
+The trusted host fetches the issue or comment through GitHub’s public API without `GITHUB_PAT`, rejects redirects and non-GitHub hosts, limits the body to 6 KiB, rejects token-shaped credential material, and returns a short-lived input ID. The browser never supplies untrusted text to `/api/run`; both lanes resolve the same cached server-side value.
+
+Replay defaults to the archived public [Pacman issue #1](https://github.com/ukend0464/pacman/issues/1), a real prompt-injection example. Faraday shows [the historical outcome PR](https://github.com/ukend0464/pacman/pull/2) only as a source artifact. Replay does not create that PR, ingest its personal data, or claim its simulated canary appears there.
 
 ## Setup
 
@@ -112,7 +114,7 @@ The current prototype intentionally enforces one active run and stores its recor
 ## Architecture
 
 ```text
-Browser (public comment URL or included fixture)
+Browser (public issue/comment URL or bundled replay case)
   │  POST /api/comment → short-lived server input ID
   │  POST /api/run twice → normalized SSE events
   ▼

@@ -62,7 +62,11 @@ export default function Home() {
   useEffect(() => {
     let active = true;
     fetch('/api/preflight', { cache: 'no-store' }).then((response) => response.json()).then((data: Preflight) => {
-      if (active) { setPreflight(data); setInput((current) => current || data.defaultInput); }
+      if (active) {
+        setPreflight(data);
+        setInput((current) => current || data.defaultInput);
+        setCommentUrl((current) => current || data.defaultInput.url || '');
+      }
     }).catch(() => { if (active) setPreflight(null); });
     return () => { active = false; };
   }, []);
@@ -154,7 +158,7 @@ export default function Home() {
 
       <section className="comparison-shell" aria-label="Agent sandbox comparison">
         <div className="same-rail" aria-hidden="true"><span>SAME AGENT</span><span>SAME TASK</span><span>SAME INPUT</span></div>
-        <AgentLane mode="off" state={unsafeState} active={comparisonBusy && !unsafeState.verdict} />
+        <AgentLane mode="off" state={unsafeState} active={comparisonBusy && !unsafeState.verdict} referenceOutcomeUrl={source === 'replay' ? input?.referenceOutcomeUrl || null : null} />
         <AgentLane mode="on" state={safeState} active={comparisonBusy && !safeState.verdict} />
       </section>
 

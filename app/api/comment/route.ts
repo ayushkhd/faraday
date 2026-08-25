@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { CommentInputError, fetchPublicGitHubComment } from '@/lib/faraday/comment-input';
+import { CommentInputError, fetchPublicGitHubInput } from '@/lib/faraday/comment-input';
 import { validateMutationRequest } from '@/lib/faraday/http-security';
 
 export const runtime = 'nodejs';
@@ -13,9 +13,9 @@ export async function POST(request: Request): Promise<Response> {
   const parsed = schema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) return Response.json({ error: 'INVALID_COMMENT_REQUEST' }, { status: 400 });
   try {
-    return Response.json(await fetchPublicGitHubComment(parsed.data.url), { headers: { 'cache-control': 'no-store' } });
+    return Response.json(await fetchPublicGitHubInput(parsed.data.url), { headers: { 'cache-control': 'no-store' } });
   } catch (error) {
     const code = error instanceof CommentInputError ? error.code : 'PUBLIC_COMMENT_UNAVAILABLE';
-    return Response.json({ error: code }, { status: code === 'INVALID_GITHUB_COMMENT_URL' ? 400 : 422 });
+    return Response.json({ error: code }, { status: code === 'INVALID_GITHUB_INPUT_URL' ? 400 : 422 });
   }
 }

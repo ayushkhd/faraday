@@ -2,15 +2,16 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { eventDescription, eventLabels, type ExperienceState } from '@/lib/faraday/client-state';
 
-type Props = { mode: 'off' | 'on'; state: ExperienceState; active: boolean };
+type Props = { mode: 'off' | 'on'; state: ExperienceState; active: boolean; referenceOutcomeUrl?: string | null };
 
 const phaseLabel: Record<ExperienceState['phase'], string> = {
   idle: 'WAITING', preparing: 'PREPARING', running: 'RUNNING', verifying: 'VERIFYING', resetting: 'RESETTING',
   breach: 'BREACH', contained: 'CONTAINED', inconclusive: 'INCONCLUSIVE', error: 'ERROR',
 };
 
-export function AgentLane({ mode, state, active }: Props) {
+export function AgentLane({ mode, state, active, referenceOutcomeUrl }: Props) {
   const sandboxed = mode === 'on';
+  const replay = state.events.some((event) => event.type === 'run.started' && event.data.source === 'replay');
   const latestWalls = [...state.events].reverse().find((event) => event.type === 'verification.walls');
   const outcome = state.verdict === 'breach'
     ? 'Breach reproduced'
@@ -60,7 +61,7 @@ export function AgentLane({ mode, state, active }: Props) {
       <section className="lane-outcome">
         <p>Outcome</p><h3>{outcome}</h3>
         {state.verdict === 'breach' ? (
-          <div className="evidence-grid danger-evidence"><span>CANARY OBSERVED</span><span>EGRESS REACHED</span><span>PR CREATED</span></div>
+          <div className="evidence-grid danger-evidence"><span>{replay ? 'SIMULATED CANARY' : 'CANARY OBSERVED'}</span><span>EGRESS REACHED</span><span>{replay ? 'SIMULATED PROOF PR' : 'PR CREATED'}</span></div>
         ) : state.verdict === 'contained' ? (
           <div className="evidence-grid safe-evidence">
             <span>{latestWalls?.data.leastPrivilege ? 'SECRETS OMITTED' : 'CHECKING SECRETS'}</span>
@@ -69,6 +70,7 @@ export function AgentLane({ mode, state, active }: Props) {
           </div>
         ) : <p className="outcome-detail">{state.verdictReason || state.error || 'Run Comparison to make the boundary visible.'}</p>}
         {state.prUrl ? <a className="proof-link" href={state.prUrl} target="_blank" rel="noreferrer">Open constrained proof PR ↗</a> : null}
+        {state.verdict === 'breach' && referenceOutcomeUrl ? <div className="historical-proof"><a href={referenceOutcomeUrl} target="_blank" rel="noreferrer">Open historical outcome PR ↗</a><small>Source artifact only · Replay did not create this PR or reproduce its personal data.</small></div> : null}
         {state.report ? <details className="report-drawer"><summary>triage-report.md <span>VIEW ARTIFACT</span></summary><div className="markdown"><ReactMarkdown remarkPlugins={[remarkGfm]} components={{ a: ({ children }) => <span>{children}</span>, img: ({ alt }) => <span>[Image omitted{alt ? `: ${alt}` : ''}]</span> }}>{state.report}</ReactMarkdown></div></details> : null}
       </section>
     </article>

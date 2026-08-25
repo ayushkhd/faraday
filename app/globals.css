@@ -75,7 +75,7 @@ main { width: min(1600px, 100%); min-height: 100vh; margin: 0 auto; border-inlin
 .comment-meta span:last-child { margin-left: auto; }
 .comment-preview > p { margin: 0; padding: 14px; color: #e8b7b9; font: 11px/1.55 var(--mono); white-space: pre-wrap; overflow-wrap: anywhere; }
 .comment-actions { padding: 8px 13px; display: flex; justify-content: space-between; align-items: center; border-top: 1px solid rgba(255, 88, 93, .16); color: #977c7e; font: 8px var(--mono); }
-.comment-actions a { color: var(--red); }.comment-actions button { border: 0; color: var(--muted); background: transparent; cursor: pointer; text-decoration: underline; }
+.source-links { display: flex; flex-wrap: wrap; gap: 14px; }.comment-actions a { color: var(--red); }.comment-actions button { border: 0; color: var(--muted); background: transparent; cursor: pointer; text-decoration: underline; }
 .readiness-note, .comparison-error { margin: 0; padding: 10px 36px; border-bottom: 1px solid; font: 10px/1.5 var(--mono); }
 .readiness-note { color: var(--amber); border-color: rgba(255, 196, 91, .25); background: rgba(255, 196, 91, .05); }
 .comparison-error { color: var(--red); border-color: rgba(255, 88, 93, .25); background: rgba(255, 88, 93, .05); }
@@ -120,6 +120,7 @@ main { width: min(1600px, 100%); min-height: 100vh; margin: 0 auto; border-inlin
 .evidence-grid span { min-height: 44px; padding: 8px; display: grid; place-items: center; border: 1px solid var(--line); text-align: center; font: 700 7px/1.35 var(--mono); }
 .danger-evidence span { color: #ff8e92; border-color: rgba(255, 88, 93, .35); background: rgba(255, 88, 93, .04); }.safe-evidence span { color: var(--acid); border-color: rgba(183, 255, 85, .27); background: rgba(183, 255, 85, .035); }
 .proof-link { display: inline-block; margin-top: 13px; color: var(--red); font: 9px var(--mono); }
+.historical-proof { margin-top: 13px; padding: 10px 12px; border: 1px solid rgba(255, 196, 91, .28); background: rgba(255, 196, 91, .035); }.historical-proof a { color: var(--amber); font: 9px var(--mono); }.historical-proof small { display: block; margin-top: 5px; color: #8b8877; font: 7px/1.45 var(--mono); }
 .report-drawer { margin-top: 13px; border: 1px solid var(--line); background: #090d0a; }
 .report-drawer summary { padding: 10px 12px; cursor: pointer; color: #c6d0c8; font: 9px var(--mono); }.report-drawer summary span { float: right; color: var(--acid); font-size: 7px; }.markdown { max-height: 260px; padding: 13px; overflow: auto; border-top: 1px solid var(--line); color: #aab5ad; font-size: 10px; line-height: 1.5; }.markdown h1, .markdown h2 { color: var(--text); font-size: 13px; margin: 15px 0 6px; }.markdown h1:first-child, .markdown h2:first-child { margin-top: 0; }
 
