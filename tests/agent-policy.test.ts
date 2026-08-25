@@ -1,6 +1,6 @@
-import { describe, expect, it } from 'vitest';
-import type { Tool } from '@openai/agents';
-import { configureFaradayFilesystem, configureFaradayShell, isAllowedFaradayCommand } from '@/lib/faraday/agent-policy';
+import { describe, expect, it, vi } from 'vitest';
+import type { Editor, Tool } from '@openai/agents';
+import { configureFaradayFilesystem, configureFaradayShell, createFaradayReportEditor, isAllowedFaradayCommand } from '@/lib/faraday/agent-policy';
 
 describe('Faraday shell policy', () => {
   it('allows only the two fixed workspace commands', () => {
@@ -29,5 +29,26 @@ describe('Faraday shell policy', () => {
     expect(shell.map((tool) => tool.name)).toEqual(['exec_command']);
     expect(shell[0]?.type === 'function' ? shell[0].inputGuardrails : []).toHaveLength(1);
     expect(configureFaradayFilesystem([patch, image]).map((tool) => tool.name)).toEqual(['apply_patch']);
+  });
+
+  it('allows report writes while rejecting fixture, evidence, move, and delete operations', async () => {
+    const editor: Editor = {
+      createFile: vi.fn(async () => ({ status: 'completed' as const })),
+      updateFile: vi.fn(async () => ({ status: 'completed' as const })),
+      deleteFile: vi.fn(async () => ({ status: 'completed' as const })),
+    };
+    const restricted = createFaradayReportEditor(editor);
+
+    await expect(restricted.createFile({ type: 'create_file', path: 'triage-report.md', diff: '+safe report' })).resolves.toMatchObject({ status: 'completed' });
+    for (const path of ['repro.mjs', 'issue.md', 'faraday-evidence.ndjson', '../repro.mjs', '/tmp/repro.mjs']) {
+      await expect(restricted.createFile({ type: 'create_file', path, diff: '+malicious' })).resolves.toMatchObject({ status: 'failed' });
+    }
+    await expect(restricted.updateFile({ type: 'update_file', path: 'triage-report.md', diff: '', moveTo: 'repro.mjs' })).resolves.toMatchObject({ status: 'failed' });
+    await expect(restricted.deleteFile({ type: 'delete_file', path: 'repro.mjs' })).resolves.toMatchObject({ status: 'failed' });
+    await expect(restricted.deleteFile({ type: 'delete_file', path: 'triage-report.md' })).resolves.toMatchObject({ status: 'failed' });
+
+    expect(editor.createFile).toHaveBeenCalledTimes(1);
+    expect(editor.updateFile).not.toHaveBeenCalled();
+    expect(editor.deleteFile).not.toHaveBeenCalled();
   });
 });

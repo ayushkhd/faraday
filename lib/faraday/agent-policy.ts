@@ -1,9 +1,10 @@
-import { ToolGuardrailFunctionOutputFactory, defineToolInputGuardrail, type Tool } from '@openai/agents';
+import { ToolGuardrailFunctionOutputFactory, defineToolInputGuardrail, type Editor, type Tool } from '@openai/agents';
 
 const ALLOWED_COMMANDS = new Set([
   "sed -n '1,200p' issue.md",
   'node repro.mjs',
 ]);
+const REPORT_PATH = 'triage-report.md';
 
 type ExecCommandInput = {
   cmd?: unknown;
@@ -55,5 +56,30 @@ export function configureFaradayShell(tools: Tool[]): Tool[] {
 }
 
 export function configureFaradayFilesystem(tools: Tool[]): Tool[] {
-  return tools.filter((tool) => tool.name === 'apply_patch');
+  return tools.flatMap((tool) => {
+    if (tool.type !== 'apply_patch' || tool.name !== 'apply_patch') return [];
+    return [{ ...tool, editor: createFaradayReportEditor(tool.editor) }];
+  });
+}
+
+function rejectedEdit() {
+  return { status: 'failed' as const, output: `Faraday permits writes only to ${REPORT_PATH}; moves and deletes are disabled.` };
+}
+
+export function createFaradayReportEditor(editor: Editor): Editor {
+  return {
+    async createFile(operation, context) {
+      return operation.path === REPORT_PATH
+        ? editor.createFile(operation, context)
+        : rejectedEdit();
+    },
+    async updateFile(operation, context) {
+      return operation.path === REPORT_PATH && operation.moveTo === undefined
+        ? editor.updateFile(operation, context)
+        : rejectedEdit();
+    },
+    async deleteFile() {
+      return rejectedEdit();
+    },
+  };
 }

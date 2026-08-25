@@ -141,6 +141,8 @@ code { font-family: var(--mono); color: var(--acid); }
 .proof-card > p:not(.card-kicker) { color: #96a49a; line-height: 1.6; }
 .danger-card { border-color: rgba(255,88,93,.45); box-shadow: inset 0 0 50px rgba(255,88,93,.025); }
 .danger-card .card-kicker { color: var(--red); }
+.neutral-card { border-color: #3f4942; box-shadow: inset 0 0 50px rgba(255,255,255,.015); }
+.neutral-card .card-kicker { color: #a7b0aa; }
 .canary { display: block; padding: 14px; margin: 22px 0; border: 1px solid rgba(255,88,93,.3); color: #ff9da0; background: #140b0c; overflow-wrap: anywhere; }
 .danger-card a { display: inline-block; margin-top: 10px; color: var(--red); font: 11px var(--mono); }
 .wall-card { padding-bottom: 8px; }
