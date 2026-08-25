@@ -12,18 +12,25 @@ const exec = promisify(execFile);
 
 async function dockerReadiness() {
   try {
-    await exec('docker', ['image', 'inspect', 'node:22-bookworm-slim'], { timeout: 5_000 });
+    await exec('docker', ['--version'], { timeout: 1_500 });
+  } catch (error) {
+    const code = (error as NodeJS.ErrnoException).code;
+    return code === 'ENOENT'
+      ? { installed: false, daemon: false, image: false, reason: 'DOCKER_NOT_INSTALLED' }
+      : { installed: true, daemon: false, image: false, reason: 'DOCKER_DAEMON_UNAVAILABLE' };
+  }
+
+  try {
+    await exec('docker', ['version', '--format', '{{.Server.Version}}'], { timeout: 1_500 });
+  } catch {
+    return { installed: true, daemon: false, image: false, reason: 'DOCKER_DAEMON_UNAVAILABLE' };
+  }
+
+  try {
+    await exec('docker', ['image', 'inspect', 'node:22-bookworm-slim'], { timeout: 1_500 });
     return { installed: true, daemon: true, image: true, reason: null };
   } catch {
-    try {
-      await exec('docker', ['version', '--format', '{{.Server.Version}}'], { timeout: 5_000 });
-      return { installed: true, daemon: true, image: false, reason: 'DOCKER_IMAGE_MISSING' };
-    } catch (second) {
-      const code = (second as NodeJS.ErrnoException).code;
-      return code === 'ENOENT'
-        ? { installed: false, daemon: false, image: false, reason: 'DOCKER_NOT_INSTALLED' }
-        : { installed: true, daemon: false, image: false, reason: 'DOCKER_DAEMON_UNAVAILABLE' };
-    }
+    return { installed: true, daemon: true, image: false, reason: 'DOCKER_IMAGE_MISSING' };
   }
 }
 

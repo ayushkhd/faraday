@@ -25,12 +25,19 @@ export default function Home() {
 
   const latestWalls = useMemo(() => [...state.events].reverse().find((event) => event.type === 'verification.walls'), [state.events]);
 
+  async function endpointError(response: Response, label: string): Promise<Error> {
+    const payload = await response.json().catch(() => null) as { error?: unknown } | null;
+    const code = typeof payload?.error === 'string' ? ` (${payload.error})` : '';
+    return new Error(`${label} returned ${response.status}${code}.`);
+  }
+
   async function run() {
     dispatch({ type: 'start' });
     try {
       if (!preflight?.csrfToken) throw new Error('Local approval token is unavailable. Refresh preflight and try again.');
       const response = await fetch('/api/run', { method: 'POST', headers: { 'content-type': 'application/json', 'x-faraday-csrf': preflight.csrfToken }, body: JSON.stringify({ mode, source }) });
-      if (!response.ok || !response.body) throw new Error(`Run endpoint returned ${response.status}.`);
+      if (!response.ok) throw await endpointError(response, 'Run endpoint');
+      if (!response.body) throw new Error('Run endpoint returned an empty stream.');
       const reader = response.body.getReader();
       const decoder = new TextDecoder();
       let pending = '';
@@ -56,7 +63,7 @@ export default function Home() {
     try {
       if (!preflight?.csrfToken) throw new Error('Local approval token is unavailable. Refresh preflight and try again.');
       const response = await fetch('/api/reset', { method: 'POST', headers: { 'content-type': 'application/json', 'x-faraday-csrf': preflight.csrfToken }, body: JSON.stringify({ runId: state.runId }) });
-      if (!response.ok) throw new Error(`Reset returned ${response.status}.`);
+      if (!response.ok) throw await endpointError(response, 'Reset');
       dispatch({ type: 'clear' });
     } catch (error) { dispatch({ type: 'failure', message: error instanceof Error ? error.message : 'Reset failed.' }); }
   }
@@ -71,7 +78,7 @@ export default function Home() {
         headers: { 'content-type': 'application/json', 'x-faraday-csrf': preflight.csrfToken },
         body: JSON.stringify({ runId: state.runId }),
       });
-      if (!response.ok) throw new Error(`Reset returned ${response.status}.`);
+      if (!response.ok) throw await endpointError(response, 'Reset');
       dispatch({ type: 'clear' });
       await run();
     } catch (error) {

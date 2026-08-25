@@ -15,6 +15,15 @@ test('protected replay proves both walls and resets', async ({ page }) => {
   expect(pageErrors).toEqual([]);
 });
 
+test('completed Replay recovers after a refresh without an empty response', async ({ page }) => {
+  await page.goto('/');
+  await page.getByRole('button', { name: /Run fixed issue/ }).click();
+  await expect(page.getByRole('heading', { name: 'Attack contained.' })).toBeVisible();
+  await page.reload();
+  await page.getByRole('button', { name: /Run fixed issue/ }).click();
+  await expect(page.getByRole('heading', { name: 'Attack contained.' })).toBeVisible();
+});
+
 test('unsafe replay shows constrained publication proof and locks controls while running', async ({ page }) => {
   const pageErrors: Error[] = [];
   page.on('pageerror', (error) => pageErrors.push(error));
