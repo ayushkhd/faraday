@@ -19,20 +19,20 @@ export async function POST(request: Request): Promise<Response> {
   if (!active) return Response.json({ error: 'RUN_NOT_FOUND' }, { status: 404 });
   if (active.running) return Response.json({ error: 'RUN_STILL_ACTIVE' }, { status: 409 });
 
-  if (!active.branch || !active.marker || active.request.source === 'replay') {
+  if (!active.issueNumber || !active.marker || active.request.source === 'replay') {
     markRunReset(active.runId);
     return Response.json({ ok: true, replay: true });
   }
   const config = getGitHubConfig();
   if (!config) return Response.json({ error: 'GITHUB_NOT_CONFIGURED' }, { status: 503 });
+  if (active.issueNumber !== config.demoIssueNumber) return Response.json({ error: 'RUN_TARGET_MISMATCH' }, { status: 409 });
   const github = new GitHubAdapter(config);
   try {
-    const prs = await github.listRunPullRequests(active.branch);
-    const marked = prs.filter((pr) => pr.body.includes(active.marker!));
-    await Promise.all(marked.map((pr) => github.closePullRequest(pr.number)));
-    await github.deleteBranch(active.branch);
+    const comments = await github.listIssueComments();
+    const marked = comments.filter((comment) => comment.body.includes(active.marker!));
+    await Promise.all(marked.map((comment) => github.deleteIssueComment(comment.id)));
     markRunReset(active.runId);
-    return Response.json({ ok: true, closedPullRequests: marked.length, branchDeleted: true });
+    return Response.json({ ok: true, deletedRunComments: marked.length });
   } catch {
     return Response.json({ error: 'TARGETED_CLEANUP_FAILED' }, { status: 502 });
   }

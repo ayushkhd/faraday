@@ -42,13 +42,14 @@ export async function GET(): Promise<Response> {
   ]);
   const missing = missingLiveVariables();
   const githubConfig = getGitHubConfig();
-  let github = { configured: Boolean(githubConfig), reachable: false, seedRef: false, reason: githubConfig ? null : 'GITHUB_CONFIG_MISSING' as string | null };
+  let github = { configured: Boolean(githubConfig), reachable: false, demoIssue: false, issueUrl: null as string | null, reason: githubConfig ? null : 'GITHUB_CONFIG_MISSING' as string | null };
   if (githubConfig) {
     try {
-      await new GitHubAdapter(githubConfig).checkSeed();
-      github = { configured: true, reachable: true, seedRef: true, reason: null };
+      const adapter = new GitHubAdapter(githubConfig);
+      await adapter.checkDemoIssue();
+      github = { configured: true, reachable: true, demoIssue: true, issueUrl: adapter.issueUrl(), reason: null };
     } catch {
-      github = { configured: true, reachable: false, seedRef: false, reason: 'GITHUB_SEED_UNREACHABLE' };
+      github = { configured: true, reachable: false, demoIssue: false, issueUrl: null, reason: 'GITHUB_DEMO_ISSUE_UNREACHABLE' };
     }
   }
   const sharedReady = missing.length === 0 && github.reachable && fixtures.ready;

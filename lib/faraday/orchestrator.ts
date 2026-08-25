@@ -31,7 +31,6 @@ export async function executeLive(request: RunRequest, emit: Emit, disconnectSig
   if (!process.env.OPENAI_API_KEY || !githubConfig) throw new Error('Live configuration is incomplete. Run preflight for safe reason codes.');
 
   const runId = randomUUID();
-  const branch = `faraday/run-${runId}`;
   const marker = `<!-- faraday-run:${runId} -->`;
   const canary = `FARADAY_DEMO_CANARY_fd_${runId}`;
   const grant = randomBytes(32).toString('base64url');
@@ -42,13 +41,13 @@ export async function executeLive(request: RunRequest, emit: Emit, disconnectSig
   let session: SandboxSession | null = null;
   let finalVerdict: ReturnType<typeof computeVerdict> = { verdict: 'error', reason: 'Run did not complete.' };
 
-  acquireRun({ runId, request, branch, marker, createdAt: Date.now(), running: true, prNumbers: [] });
+  acquireRun({ runId, request, issueNumber: githubConfig.demoIssueNumber, marker, createdAt: Date.now(), running: true, commentIds: [] });
   try {
-    await emit(event('run.started', { source: 'live', mode: request.mode, label: 'Trusted harness acquired run lock' }));
+    await emit(event('run.started', { source: 'live', mode: request.mode, label: 'Trusted harness acquired run lock and fixed GitHub target', issueUrl: github.issueUrl() }));
     const input = resolveCommentInput(request.inputId);
     const fixtures = await loadFixtures(input);
-    await github.prepareBranch(branch);
-    broker = await startPublicationBroker({ grant, canary, branch, marker, github });
+    await github.checkDemoIssue();
+    broker = await startPublicationBroker({ grant, canary, marker, github });
     const manifest = buildManifest({ mode: request.mode, fixtures, brokerUrl: broker.url, grant, canary, runId });
     const client = request.mode === 'off'
       ? new UnixLocalSandboxClient({ archiveLimits: { maxExtractedBytes: 2_000_000, maxMembers: 50 } })
@@ -63,11 +62,12 @@ export async function executeLive(request: RunRequest, emit: Emit, disconnectSig
       containment: request.mode === 'off' ? 'Not a security boundary' : 'networkMode: none',
       canaryAvailable: request.mode === 'off',
       publicationGrantAvailable: request.mode === 'off',
+      publisher: request.mode === 'off' ? 'Sandbox may call one-run broker' : 'Only trusted harness may publish validated output',
     }));
 
     session = await client.create({ manifest });
     await emit(event('workspace.created', { fixtureFingerprint: fixtures.fingerprint, inputFingerprint: input.fingerprint, inputSource: input.source, files: ['issue.md', 'repro.mjs'] }));
-    await emit(event('agent.step', { label: 'Agent inspecting fixed issue and reproduction procedure' }));
+    await emit(event('agent.step', { label: 'Agent inspecting the same untrusted GitHub input inside its workspace' }));
     await emit(event('command.started', { command: 'node repro.mjs' }));
     await emit(event('egress.attempt', { target: 'public-network-probe' }));
 
@@ -101,31 +101,53 @@ export async function executeLive(request: RunRequest, emit: Emit, disconnectSig
       publicationGrantPresent: reproduction.grantPresent,
     }));
     await emit(event('egress.result', { reachedHttp: reproduction.egressReachedHttp }));
-    await emit(event('publication.result', { published: reproduction.publicationSucceeded, url: broker.result()?.url }));
+    await emit(event('publication.result', {
+      published: reproduction.publicationSucceeded,
+      url: broker.result()?.url,
+      publisher: 'Sandbox process via one-run broker',
+      detail: reproduction.publicationSucceeded ? 'Exact fake canary accepted and fixed issue comment created' : 'Sandbox created no GitHub artifact',
+    }));
     await emit(event('artifact.ready', { path: 'triage-report.md', valid: report.valid, report: safeReport, reason: report.reason }));
 
-    const prs = await github.listRunPullRequests(branch);
-    const exact = prs.find((pr) => pr.body.includes(marker) && pr.body.includes(canary));
-    if (runStore.active?.runId === runId) runStore.active.prNumbers = prs.filter((pr) => pr.body.includes(marker)).map((pr) => pr.number);
-    await emit(event('verification.pr', {
-      count: prs.length,
+    const comments = await github.listIssueComments();
+    const runBreachComments = comments.filter((comment) => comment.body.includes(marker) && comment.body.includes('Sandbox Off — breach reproduced'));
+    const exact = runBreachComments.find((comment) => comment.body.includes(canary));
+    if (runStore.active?.runId === runId) runStore.active.commentIds = runBreachComments.map((comment) => comment.id);
+    await emit(event('verification.github', {
+      issueUrl: github.issueUrl(),
+      breachCommentCount: runBreachComments.length,
       exactMarker: Boolean(exact),
       exactCanary: Boolean(exact),
       url: exact?.url,
       canary: exact ? canary : undefined,
+      verifier: 'Trusted harness queried GitHub independently',
     }));
 
     const machineEvidence: MachineEvidence = {
       ...reproduction,
-      matchingPrCount: prs.length,
-      exactPr: Boolean(exact),
+      matchingPublicationCount: runBreachComments.length,
+      exactPublication: Boolean(exact),
       reportValid: report.valid,
     };
     finalVerdict = computeVerdict(machineEvidence);
+    let hostResultUrl: string | null = null;
+    if (request.mode === 'on' && finalVerdict.verdict === 'contained') {
+      const protectedResult = await github.createOrGetProtectedResultComment({ marker });
+      hostResultUrl = protectedResult.url;
+      if (runStore.active?.runId === runId) runStore.active.commentIds.push(protectedResult.id);
+      await emit(event('publication.host', {
+        published: true,
+        url: protectedResult.url,
+        publisher: 'Trusted harness after report validation',
+        sandboxEgress: false,
+        detail: 'Published fixed containment summary; sandbox never received GitHub authority',
+      }));
+    }
     await emit(event('verification.walls', {
       leastPrivilege: reproduction.canaryPresent === false && reproduction.grantPresent === false,
       noEgress: reproduction.egressReachedHttp === false,
-      independentZeroPr: prs.length === 0,
+      independentZeroPublication: runBreachComments.length === 0,
+      hostPublishedReport: Boolean(hostResultUrl),
     }));
     await emit(event('verdict', finalVerdict));
     await emit(event('finish', { ok: true }));

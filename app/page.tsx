@@ -146,19 +146,21 @@ export default function Home() {
         <div className="top-actions">
           <div className="source-switch" aria-label="Run source">{(['live', 'replay'] as const).map((item) => <button key={item} disabled={comparisonBusy} className={source === item ? 'active' : ''} aria-pressed={source === item} onClick={() => setSource(item)}>{item}</button>)}</div>
           <span className="model-pill">{preflight?.model || 'MODEL'}</span>
-          <button className="compare-button" disabled={comparisonBusy || !comparisonReady} onClick={() => void runComparison()}>{comparisonBusy ? <><span className="spinner" /> Running comparison</> : '▷ Run comparison'}</button>
+          <button className="compare-button" disabled={comparisonBusy || !comparisonReady} onClick={() => void runComparison()}>{comparisonBusy ? <><span className="spinner" /> Running comparison</> : source === 'live' ? '▷ Run live comparison' : '▷ Run replay'}</button>
         </div>
       </nav>
 
       <ReadinessPanel preflight={preflight} />
       <IssuePanel input={input} url={commentUrl} loading={inputLoading} error={inputError} disabled={comparisonBusy || !preflight} onUrlChange={setCommentUrl} onLoad={() => void loadComment()} onUseFixture={() => { if (preflight) { setInput(preflight.defaultInput); setInputError(null); } }} />
 
+      {source === 'live' && preflight?.github.issueUrl ? <div className="live-disclosure" role="status"><strong>LIVE WRITES ENABLED</strong><span>Run posts one fixed breach proof and one trusted-harness containment result to the dedicated issue.</span><a href={preflight.github.issueUrl} target="_blank" rel="noreferrer">Open target issue ↗</a></div> : null}
+
       {!comparisonReady && preflight ? <p className="readiness-note" role="status">{source === 'live' ? 'Live comparison needs OpenAI, GitHub, and Docker ready. Switch to Replay for the deterministic walkthrough.' : 'Restore the included fixture to run Replay.'}</p> : null}
       {comparisonError ? <p className="comparison-error" role="alert">{comparisonError}</p> : null}
 
       <section className="comparison-shell" aria-label="Agent sandbox comparison">
         <div className="same-rail" aria-hidden="true"><span>SAME AGENT</span><span>SAME TASK</span><span>SAME INPUT</span></div>
-        <AgentLane mode="off" state={unsafeState} active={comparisonBusy && !unsafeState.verdict} referenceOutcomeUrl={source === 'replay' ? input?.referenceOutcomeUrl || null : null} />
+        <AgentLane mode="off" state={unsafeState} active={comparisonBusy && !unsafeState.verdict} />
         <AgentLane mode="on" state={safeState} active={comparisonBusy && !safeState.verdict} />
       </section>
 
@@ -166,7 +168,7 @@ export default function Home() {
         <div><span className="diff-icon">≠</span><strong>Configuration diff <small>(only)</small></strong></div>
         <p className="removed">− network: host<br />− canary + grant: present</p>
         <p className="added">+ network: none<br />+ canary + grant: omitted</p>
-        <p>Sandboxing removes authority and egress—not useful work.</p>
+        <p>Off: sandbox reaches broker. On: sandbox has no egress; harness publishes only validated output.</p>
         {hasResults ? <button type="button" onClick={() => void resetComparison()} disabled={comparisonBusy}>{comparisonBusy ? 'Resetting…' : 'Reset comparison'}</button> : null}
       </section>
 

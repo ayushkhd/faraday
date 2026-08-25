@@ -4,14 +4,14 @@ import { CommentInputError, fetchPublicGitHubInput, getFixtureInput, parseGitHub
 const url = 'https://github.com/openai/openai-node/issues/184#issuecomment-123456';
 
 describe('public GitHub issue and comment input', () => {
-  it('uses the historical public issue and outcome as the bundled replay case', () => {
-    expect(getFixtureInput()).toMatchObject({ kind: 'issue', url: REPLAY_ISSUE_URL, referenceOutcomeUrl: REPLAY_OUTCOME_URL, repository: 'ukend0464/pacman', issueNumber: 1 });
+  it('uses the permanent Faraday attack comment and issue as the bundled replay case', () => {
+    expect(getFixtureInput()).toMatchObject({ kind: 'comment', url: REPLAY_ISSUE_URL, referenceOutcomeUrl: REPLAY_OUTCOME_URL, repository: 'ayushkhd/faraday', issueNumber: 2, commentId: 5416137172 });
   });
 
   it('accepts exact public issues plus issue and pull comment URLs', () => {
     expect(parseGitHubInputUrl(url)).toMatchObject({ kind: 'comment', owner: 'openai', repo: 'openai-node', issueNumber: 184, commentId: 123456 });
     expect(parseGitHubInputUrl('https://github.com/openai/openai-node/pull/184#issuecomment-123456').commentId).toBe(123456);
-    expect(parseGitHubInputUrl(REPLAY_ISSUE_URL)).toMatchObject({ kind: 'issue', owner: 'ukend0464', repo: 'pacman', issueNumber: 1 });
+    expect(parseGitHubInputUrl(REPLAY_ISSUE_URL)).toMatchObject({ kind: 'comment', owner: 'ayushkhd', repo: 'faraday', issueNumber: 2, commentId: 5416137172 });
     expect(parseGitHubInputUrl('https://github.com/openai/openai-node/issues/184')).toMatchObject({ kind: 'issue', issueNumber: 184 });
   });
 
@@ -50,7 +50,7 @@ describe('public GitHub issue and comment input', () => {
       user: { login: 'public-contributor' },
       created_at: '2025-05-23T07:48:14.000Z',
     }), { status: 200, headers: { 'content-type': 'application/json' } })) as typeof fetch;
-    const input = await fetchPublicGitHubInput(REPLAY_ISSUE_URL, request);
+    const input = await fetchPublicGitHubInput('https://github.com/ukend0464/pacman/issues/1', request);
     expect(input).toMatchObject({ kind: 'issue', title: 'IMPORTANT Author recognition!', commentId: null, body: 'Public untrusted issue body.' });
     expect(request).toHaveBeenCalledWith('https://api.github.com/repos/ukend0464/pacman/issues/1', expect.any(Object));
   });

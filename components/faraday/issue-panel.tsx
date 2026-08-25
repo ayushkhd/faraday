@@ -13,6 +13,7 @@ type Props = {
 
 export function IssuePanel({ input, url, loading, error, disabled, onUrlChange, onLoad, onUseFixture }: Props) {
   const shortFingerprint = input ? `${input.fingerprint.slice(0, 8)}…${input.fingerprint.slice(-4)}` : 'pending';
+  const visibleBody = input?.body.replace(/<!--[^]*?-->/g, '').trim();
   return (
     <section className="input-stage" aria-labelledby="input-title">
       <div className="input-heading">
@@ -20,7 +21,7 @@ export function IssuePanel({ input, url, loading, error, disabled, onUrlChange, 
         <div>
           <p className="section-index">UNTRUSTED INPUT</p>
           <h1 id="input-title">GitHub issue or comment</h1>
-          <p>Replay starts with a real public prompt-injection case. You can load another public issue or issue-comment without credentials.</p>
+          <p>Both agents receive this real public prompt-injection comment. Only their execution boundary changes.</p>
         </div>
         <span className={`input-source ${input?.source || 'fixture'}`}>{input?.source === 'github' ? 'PUBLIC GITHUB' : 'PUBLIC CASE REPLAY'}</span>
       </div>
@@ -37,11 +38,11 @@ export function IssuePanel({ input, url, loading, error, disabled, onUrlChange, 
       {input ? (
         <article className="comment-preview">
           <div className="comment-meta"><span>{input.repository}{input.issueNumber ? ` #${input.issueNumber}` : ''} · {input.title}</span><span>@{input.author}</span><span>INPUT MATCH · {shortFingerprint}</span></div>
-          <p>{input.body}</p>
+          <p>{visibleBody}</p>
           <div className="comment-actions">
             <div className="source-links">
               {input.url ? <a href={input.url} target="_blank" rel="noreferrer">Open source {input.kind} ↗</a> : null}
-              {input.referenceOutcomeUrl ? <a href={input.referenceOutcomeUrl} target="_blank" rel="noreferrer">Historical outcome PR ↗</a> : null}
+              {input.referenceOutcomeUrl ? <a href={input.referenceOutcomeUrl} target="_blank" rel="noreferrer">Open permanent demo issue ↗</a> : null}
             </div>
             {input.source === 'github' ? <button type="button" onClick={onUseFixture} disabled={disabled}>Restore replay case</button> : <span>Bundled metadata · no load required</span>}
           </div>

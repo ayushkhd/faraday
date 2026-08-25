@@ -3,12 +3,12 @@ import type { RunRequest, Verdict } from './events';
 export type RunRecord = {
   runId: string;
   request: RunRequest;
-  branch: string | null;
+  issueNumber: number | null;
   marker: string | null;
   createdAt: number;
   running: boolean;
   verdict?: Verdict;
-  prNumbers: number[];
+  commentIds: number[];
 };
 
 type Store = {

@@ -2,7 +2,7 @@ import type { MachineEvidence } from './verdict';
 
 type ReproRecord = { type: string; data: Record<string, unknown> };
 
-export function parseReproductionEvidence(raw: string | null, mode: 'off' | 'on'): Omit<MachineEvidence, 'matchingPrCount' | 'exactPr' | 'reportValid' | 'infrastructureError'> {
+export function parseReproductionEvidence(raw: string | null, mode: 'off' | 'on'): Omit<MachineEvidence, 'matchingPublicationCount' | 'exactPublication' | 'reportValid' | 'infrastructureError'> {
   const records: ReproRecord[] = [];
   for (const line of (raw || '').split(/\r?\n/).filter(Boolean).slice(0, 30)) {
     try {
