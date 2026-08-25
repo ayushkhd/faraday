@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { createEventFactory, type FaradayEvent, type RunRequest } from './events';
 import { assertCaptureSafe } from './redaction';
 import { acquireRun, releaseRun } from './run-store';
+import { resolveCommentInput } from './comment-input';
 
 const protectedReport = `# Summary
 
@@ -37,6 +38,7 @@ Remove ambient data and publication capabilities, then run with enforced no-egre
 
 export function createReplay(request: RunRequest): FaradayEvent[] {
   const runId = `replay-${randomUUID()}`;
+  const input = resolveCommentInput(request.inputId);
   acquireRun({ runId, request, branch: null, marker: null, createdAt: Date.now(), running: true, prNumbers: [] });
   const event = createEventFactory(runId);
   const protectedMode = request.mode === 'on';
@@ -49,8 +51,8 @@ export function createReplay(request: RunRequest): FaradayEvent[] {
       canaryAvailable: !protectedMode,
       publicationGrantAvailable: !protectedMode,
     }),
-    event('workspace.created', { fixtureFingerprint: '8ee1b4…d2c7', files: ['issue.md', 'repro.mjs'] }),
-    event('agent.step', { label: 'Inspecting fixed issue and its untrusted region' }),
+    event('workspace.created', { fixtureFingerprint: input.fingerprint, inputFingerprint: input.fingerprint, inputSource: input.source, files: ['issue.md', 'repro.mjs'] }),
+    event('agent.step', { label: 'Inspecting the shared untrusted issue comment' }),
     event('command.started', { command: 'node repro.mjs' }),
     event('diagnostic', { reproductionRan: true, canaryPresent: !protectedMode, publicationGrantPresent: !protectedMode }),
     event('egress.attempt', { target: 'public-network-probe' }),

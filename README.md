@@ -1,9 +1,9 @@
 # Faraday
 
-Faraday is a local-first OpenAI Sandbox Agents demonstrator: one fixed security-triage agent runs against the same immutable issue and reproduction in two different execution boundaries.
+Faraday is a local-first OpenAI Sandbox Agents demonstrator: one security-triage agent processes the same bounded, untrusted GitHub issue comment and fixed reproduction in two execution boundaries shown side by side.
 
-- **Containment off:** `UnixLocalSandboxClient` receives a unique fake canary and a one-run publication grant. Unix-local is visibly labeled as a local executor, not a security boundary. The fixed script can ask a trusted host broker to publish the fake canary in one real PR.
-- **Containment on:** `DockerSandboxClient({ image: 'node:22-bookworm-slim', networkMode: 'none' })` receives neither value. The reproduction still runs and the agent still writes `triage-report.md`, but least privilege and no-egress prevent publication.
+- **Sandbox Off:** `UnixLocalSandboxClient` receives a unique fake canary and a one-run publication grant. Unix-local is visibly labeled as a local executor, not a security boundary. The fixed script can ask a trusted host broker to publish the fake canary in one real PR.
+- **Sandbox On:** `DockerSandboxClient({ image: 'node:22-bookworm-slim', networkMode: 'none' })` receives neither value. The reproduction still runs and the agent still writes `triage-report.md`, but least privilege and no-egress prevent publication.
 
 Both lanes use the same `SandboxAgent`, instructions, command allowlist, capabilities, issue, and script. Only the manifest and sandbox client change. Verdicts come from machine evidence and an independent host-side GitHub query—not from the model’s claims.
 
@@ -17,7 +17,8 @@ Both lanes use the same `SandboxAgent`, instructions, command allowlist, capabil
 | Canary | Fake | Unique `FARADAY_DEMO_CANARY_fd_<runId>` value with no authority. It is never a real credential. |
 | GitHub authority | Real but host-only | The PAT remains in trusted Node process memory and is never materialized into either workspace. |
 | Publication ability | Constrained | A short-lived broker accepts only the exact run grant/canary and ignores all target/content choices. |
-| Issue and reproduction | Fixed fixture | Auditable, versioned, and intentionally representative; browser input is not accepted. |
+| Issue comment | Real public input or included fixture | A public `github.com` issue-comment URL is fetched without credentials, bounded to 6 KiB, cached for 30 minutes, and supplied identically to both runs. |
+| Reproduction | Fixed fixture | `repro.mjs` remains versioned and immutable; pasted comments cannot change commands, manifests, or publication targets. |
 | Replay | Labeled simulation | Same schemas and UI reducer, deterministic timing, no API key, PAT, Docker, or side effect. |
 
 ## Prerequisites
@@ -32,6 +33,16 @@ Both lanes use the same `SandboxAgent`, instructions, command allowlist, capabil
   - Pull requests: read and write
 
 Never point Faraday at a personal, production, private, or customer repository.
+
+## Safe input model
+
+The comparison accepts only canonical public GitHub issue-comment links such as:
+
+```text
+https://github.com/owner/repo/issues/184#issuecomment-123456
+```
+
+The trusted host fetches the comment through GitHub’s public API without `GITHUB_PAT`, rejects redirects and non-GitHub hosts, limits the body to 6 KiB, rejects token-shaped credential material, and returns a short-lived input ID. The browser never supplies comment text to `/api/run`; both lanes resolve the same cached server-side value. The included demo fixture remains available for an offline, deterministic walkthrough.
 
 ## Setup
 
@@ -64,22 +75,22 @@ Faraday needs a branch whose commit can serve as the base for a unique `faraday/
 
 ### Replay
 
-Select **Replay**, choose a lane, and click **Run fixed issue**. A persistent Replay badge remains visible. Replay uses the production event schema and reducer but performs no model, Docker, network, or GitHub action.
+Select **Replay** and click **Run comparison**. Faraday animates Sandbox Off and Sandbox On side by side through the production event schema and reducers. Replay performs no model, Docker, publication, or GitHub mutation; loading an optional public comment is a separate read-only request.
 
-### Live — containment off
+### Live — Sandbox Off
 
-Selecting **Live** and **Containment off** explicitly approves one constrained demo PR. The trusted harness:
+Selecting **Live** and clicking **Run comparison** explicitly approves one constrained demo PR during the Sandbox Off half. The trusted harness:
 
 1. Creates a run ID, exact branch, marker, fake canary, and random grant.
 2. Creates the exact branch from `GITHUB_SEED_REF`.
 3. Starts a localhost broker with a short TTL and 2 KiB request limit.
-4. Materializes the fixed workspace into a Unix-local session with canary and grant—but no GitHub PAT. The agent shell accepts only the fixed issue-read and reproduction commands.
+4. Materializes the server-resolved comment and fixed reproduction into a Unix-local session with canary and grant—but no GitHub PAT. The agent shell accepts only the fixed issue-read and reproduction commands.
 5. Runs the shared agent, retrieves the report/evidence, independently queries GitHub, and computes the verdict.
 6. Closes the sandbox and broker in `finally`.
 
 Unix-local executes with the local user’s authority and remains unsuitable as a general containment boundary. Faraday compensates for this demo by filtering the agent tool surface to two exact fixed commands, removing interactive shell and image-reading tools, keeping filesystem writes workspace-scoped, and redacting the model-authored report before it reaches SSE.
 
-### Live — containment on
+### Live — Sandbox On
 
 The protected lane uses a stock Node Docker image, no broad or pre-existing host mounts, no Docker socket, no privileged mode, no exposed ports, no canary, no publication grant, and `networkMode: 'none'`. The SDK creates one narrow temporary host workspace and bind-mounts it at `/workspace` for the session, then removes it during close. Docker must already be running and the image pulled. A missing Docker daemon disables only this Live lane.
 
@@ -94,15 +105,16 @@ PR absence alone is never containment.
 
 ## Reset
 
-Reset accepts only the active run ID. The server derives the branch and marker from its in-memory record, closes only marked PRs, and deletes only that exact run branch. Repeated cleanup treats already-clean GitHub resources as success. Replay reset simply clears the local active replay record.
+Both Live outcomes remain inspectable after the comparison, including the constrained proof PR link. **Reset comparison** sends the two opaque run IDs back to the trusted harness. The server resolves each branch and marker from its in-memory records, closes only marked PRs, and deletes only those exact run branches. Starting another comparison first performs the same targeted cleanup.
 
 The current prototype intentionally enforces one active run and stores its record in `globalThis` so Next.js development reloads do not lose it. Restarting the process loses that record; clean any abandoned demo branch manually if the process is killed mid-run.
 
 ## Architecture
 
 ```text
-Browser (fixed mode/source only)
-  │  POST /api/run → normalized SSE events
+Browser (public comment URL or included fixture)
+  │  POST /api/comment → short-lived server input ID
+  │  POST /api/run twice → normalized SSE events
   ▼
 Trusted Next.js Node harness
   ├─ owns OpenAI + GitHub credentials, audit, timeout, redaction, verification
@@ -113,7 +125,7 @@ Trusted Next.js Node harness
        ├─ OFF: UnixLocalSandboxClient + fake canary + one-run grant
        └─ ON : DockerSandboxClient(networkMode:'none') + neither value
 
-Shared SandboxAgent + fixed issue.md + fixed repro.mjs
+Shared SandboxAgent + same bounded issue.md + fixed repro.mjs
 ```
 
 The agent never receives a GitHub PAT. The broker accepts only `{ grant, canary }`, rejects extra fields, and supplies repository, base, head, title, marker, and body template itself.
@@ -121,8 +133,9 @@ The agent never receives a GitHub PAT. The broker accepts only `{ grant, canary 
 ## API
 
 - `GET /api/preflight` returns safe readiness objects, reason codes, missing variable names, and an in-memory same-origin approval nonce—never credential values.
-- `POST /api/run` accepts only `{ mode: 'off' | 'on', source: 'live' | 'replay' }` and streams versioned, sequenced SSE.
-- `POST /api/reset` accepts only the active `{ runId }` and performs targeted cleanup.
+- `POST /api/comment` accepts one canonical public GitHub issue-comment URL, fetches it without authorization, and returns a bounded short-lived input record.
+- `POST /api/run` accepts only `{ mode: 'off' | 'on', source: 'live' | 'replay', inputId? }` and streams versioned, sequenced SSE. It never accepts comment text, prompts, commands, manifests, or targets.
+- `POST /api/reset` accepts only a harness-issued `{ runId }` and performs idempotent, targeted cleanup.
 
 All handlers use the Node runtime and disable caching. State-changing routes require JSON, an exact loopback Host/Origin pair, same-origin browser metadata when present, and the preflight nonce. UI events are normalized and bounded; raw model reasoning and raw tool streams are never sent to the browser. Model-authored report content is token/known-value redacted, links and images are inert in the report preview, and tracing keeps span structure while setting `traceIncludeSensitiveData: false`.
 
@@ -136,7 +149,7 @@ npm run test:e2e
 npm run build
 ```
 
-The integration test runs the fixed reproduction against a mock broker and verifies that canary/grant values do not appear in stdout or the evidence artifact. Policy tests reject arbitrary shell commands, host paths, cross-origin mutation attempts, bad content types, and missing approval nonces. Live OpenAI/GitHub acceptance requires locally configured rotated credentials. The Docker integration acceptance requires a responsive daemon and is skipped after a bounded readiness timeout otherwise.
+The integration test runs the fixed reproduction against a mock broker and verifies that canary/grant values do not appear in stdout or the evidence artifact. Input tests reject non-GitHub URLs, ambiguous comment links, redirects, oversized content, browser-supplied bodies, and authenticated comment fetches. Policy tests reject arbitrary shell commands, host paths, cross-origin mutation attempts, bad content types, and missing approval nonces. Live OpenAI/GitHub acceptance requires locally configured rotated credentials. The Docker integration acceptance requires a responsive daemon and is skipped after a bounded readiness timeout otherwise.
 
 Before packaging or recording, scan source, `.next`, logs, traces, Playwright output, screenshots, and replay data for actual credential values. Do not pass secrets as command-line arguments during scanning because terminal logs are themselves an exposure surface.
 

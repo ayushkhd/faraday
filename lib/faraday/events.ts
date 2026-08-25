@@ -3,6 +3,7 @@ import { z } from 'zod';
 export const runRequestSchema = z.object({
   mode: z.enum(['off', 'on']),
   source: z.enum(['live', 'replay']),
+  inputId: z.string().min(1).max(64).optional(),
 }).strict();
 
 export type RunRequest = z.infer<typeof runRequestSchema>;

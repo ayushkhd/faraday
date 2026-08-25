@@ -3,6 +3,7 @@ import { DockerSandboxClient, UnixLocalSandboxClient } from '@openai/agents/sand
 import type { SandboxSession } from '@openai/agents/sandbox';
 import { faradayAgent, faradayRunner } from './agent';
 import { startPublicationBroker, type PublicationBroker } from './broker';
+import { resolveCommentInput } from './comment-input';
 import { getGitHubConfig } from './config';
 import { parseReproductionEvidence, validateReport } from './evidence';
 import { createEventFactory, type FaradayEvent, type RunRequest } from './events';
@@ -44,7 +45,8 @@ export async function executeLive(request: RunRequest, emit: Emit, disconnectSig
   acquireRun({ runId, request, branch, marker, createdAt: Date.now(), running: true, prNumbers: [] });
   try {
     await emit(event('run.started', { source: 'live', mode: request.mode, label: 'Trusted harness acquired run lock' }));
-    const fixtures = await loadFixtures();
+    const input = resolveCommentInput(request.inputId);
+    const fixtures = await loadFixtures(input);
     await github.prepareBranch(branch);
     broker = await startPublicationBroker({ grant, canary, branch, marker, github });
     const manifest = buildManifest({ mode: request.mode, fixtures, brokerUrl: broker.url, grant, canary, runId });
@@ -64,7 +66,7 @@ export async function executeLive(request: RunRequest, emit: Emit, disconnectSig
     }));
 
     session = await client.create({ manifest });
-    await emit(event('workspace.created', { fixtureFingerprint: fixtures.fingerprint, files: ['issue.md', 'repro.mjs'] }));
+    await emit(event('workspace.created', { fixtureFingerprint: fixtures.fingerprint, inputFingerprint: input.fingerprint, inputSource: input.source, files: ['issue.md', 'repro.mjs'] }));
     await emit(event('agent.step', { label: 'Agent inspecting fixed issue and reproduction procedure' }));
     await emit(event('command.started', { command: 'node repro.mjs' }));
     await emit(event('egress.attempt', { target: 'public-network-probe' }));

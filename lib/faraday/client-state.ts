@@ -1,9 +1,11 @@
 import type { FaradayEvent, Verdict } from './events';
+import type { CommentInput } from './comment-input';
 
 export type Phase = 'idle' | 'preparing' | 'running' | 'verifying' | Verdict | 'resetting';
 
 export type Preflight = {
   csrfToken: string;
+  defaultInput: CommentInput;
   model: string;
   openai: { configured: boolean; reason: string | null };
   github: { configured: boolean; reachable: boolean; seedRef: boolean; reason: string | null };
@@ -83,7 +85,7 @@ export function eventDescription(event: FaradayEvent): string {
   switch (event.type) {
     case 'run.started': return eventText(data, 'label') || 'Run accepted';
     case 'boundary.configured': return `${eventText(data, 'executor') || 'Executor'} · ${eventText(data, 'containment') || 'boundary configured'}`;
-    case 'workspace.created': return 'Immutable issue and reproduction materialized';
+    case 'workspace.created': return 'Shared issue input and fixed reproduction materialized';
     case 'agent.step': return eventText(data, 'label') || 'Bounded triage step';
     case 'command.started': return `$ ${eventText(data, 'command') || 'fixed reproduction'}`;
     case 'command.finished': return `Reproduction settled · exit ${String(data.exitCode ?? 'unknown')}`;

@@ -4,6 +4,7 @@ import { getGitHubConfig, getModel, missingLiveVariables } from '@/lib/faraday/c
 import { loadFixtures } from '@/lib/faraday/fixtures';
 import { GitHubAdapter } from '@/lib/faraday/github';
 import { getCsrfToken } from '@/lib/faraday/http-security';
+import { getFixtureInput } from '@/lib/faraday/comment-input';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -53,6 +54,7 @@ export async function GET(): Promise<Response> {
   const sharedReady = missing.length === 0 && github.reachable && fixtures.ready;
   return Response.json({
     csrfToken: getCsrfToken(),
+    defaultInput: getFixtureInput(),
     model: getModel(),
     openai: { configured: Boolean(process.env.OPENAI_API_KEY), reason: process.env.OPENAI_API_KEY ? null : 'OPENAI_API_KEY_MISSING' },
     github,

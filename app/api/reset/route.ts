@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { getGitHubConfig } from '@/lib/faraday/config';
 import { GitHubAdapter } from '@/lib/faraday/github';
-import { markRunReset, runStore } from '@/lib/faraday/run-store';
+import { getRunForReset, markRunReset, runStore } from '@/lib/faraday/run-store';
 import { validateMutationRequest } from '@/lib/faraday/http-security';
 
 export const runtime = 'nodejs';
@@ -14,9 +14,9 @@ export async function POST(request: Request): Promise<Response> {
   if (rejection) return Response.json({ error: rejection }, { status: 403 });
   const parsed = schema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) return Response.json({ error: 'INVALID_RESET_REQUEST' }, { status: 400 });
-  const active = runStore.active;
-  if (!active && runStore.lastResetRunId === parsed.data.runId) return Response.json({ ok: true, alreadyClean: true });
-  if (!active || active.runId !== parsed.data.runId) return Response.json({ error: 'RUN_NOT_FOUND' }, { status: 404 });
+  const active = getRunForReset(parsed.data.runId);
+  if (!active && runStore.resetRunIds.has(parsed.data.runId)) return Response.json({ ok: true, alreadyClean: true });
+  if (!active) return Response.json({ error: 'RUN_NOT_FOUND' }, { status: 404 });
   if (active.running) return Response.json({ error: 'RUN_STILL_ACTIVE' }, { status: 409 });
 
   if (!active.branch || !active.marker || active.request.source === 'replay') {

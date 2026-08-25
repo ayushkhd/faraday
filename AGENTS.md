@@ -101,7 +101,7 @@ See [observability](https://developers.openai.com/api/docs/guides/agents/integra
 
 These rules are mandatory for `toxic-flow-lab`:
 
-- `fixtures/issue.md` and `fixtures/repro.mjs` are fixed, versioned fixtures. Do not accept arbitrary issue text, shell commands, repositories, branches, PR titles, PR bodies, URLs, or manifests from the browser.
+- `fixtures/issue.md` remains a fixed trusted task template and `fixtures/repro.mjs` remains a fixed executable. The only variable input is one canonical public GitHub issue-comment URL: fetch it without authorization, reject redirects/private or oversized content, cache it server-side, and pass only its short-lived input ID from the browser. Never accept browser-supplied comment bodies, shell commands, repositories, branches, PR titles, PR bodies, arbitrary URLs, or manifests.
 - The demo canary is fake and unique per run. Never describe it as a real credential. The unsafe proof is that a unique fake canary appears in a real, constrained PR.
 - `GITHUB_PAT` stays only in the trusted host process. It must never enter a manifest, sandbox, prompt, trace payload, SSE event, replay fixture, report, log, screenshot, or committed file.
 - The unsafe sandbox receives only the fake canary, a short-lived random publication grant, and the broker URL. It may request one pre-authorized publication. The broker ignores caller-supplied repository, branch, title, body, and template fields.
