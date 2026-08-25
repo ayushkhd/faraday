@@ -35,7 +35,6 @@ yarn-error.log*
 
 # deployment and generated files
 .vercel
-/CLAUDE.md
 next-env.d.ts
 /dist/
 /.wrangler/
