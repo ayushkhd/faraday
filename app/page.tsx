@@ -107,8 +107,31 @@ export default function Home() {
         </div>
 
         <div className={`replay-stage replay-stage-${stage}`}>
-          <div className={`github-window ${stage === 4 ? 'showing-pr' : ''}`}>
-            {stage < 4 ? (
+          <div className={`github-window ${stage === 0 ? 'showing-chat' : stage === 4 ? 'showing-pr' : ''}`}>
+            {stage === 0 ? (
+              <div className="sim-chat">
+                <div className="chat-topbar">
+                  <div><span className="agent-mini">AI</span><p><strong>Coding workspace</strong><small>GitHub MCP connected</small></p></div>
+                  <span className="secure-session"><i /> AUTHENTICATED</span>
+                </div>
+                <div className="chat-context">
+                  <span>NEW SESSION</span>
+                  <p>The agent can read and write repositories available to your GitHub account.</p>
+                </div>
+                <div className="chat-thread">
+                  <div className="assistant-bubble"><span className="agent-mini">AI</span><p>What would you like me to work on?</p></div>
+                  <div className="user-bubble">
+                    <small>YOU</small>
+                    <p>Have a look at the open issues in <code>ukend0464/pacman</code> and summarize what needs attention.</p>
+                    <span>Sent just now</span>
+                  </div>
+                  <div className="intent-card">
+                    <span>✓</span><div><strong>BENIGN USER INTENT</strong><p>Review public issues. No private repository access or publishing was requested.</p></div>
+                  </div>
+                </div>
+                <div className="chat-composer"><span>Ask the coding agent…</span><button aria-label="Send message">↑</button></div>
+              </div>
+            ) : stage < 4 ? (
               <>
                 <div className="github-chrome">
                   <div className="gh-dots"><i /><i /><i /></div>
@@ -132,7 +155,6 @@ export default function Home() {
                     </div>
                   </div>
                 </div>
-                {stage === 0 && <div className="context-shield"><span>NOT YET IN AGENT CONTEXT</span><p>The user has only entered a harmless request.</p></div>}
                 {stage >= 2 && <div className="payload-flag"><span>INDIRECT PROMPT INJECTION</span><p>Attacker-authored data is now steering the agent.</p></div>}
               </>
             ) : (

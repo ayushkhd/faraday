@@ -190,6 +190,23 @@ footer p { color:var(--muted); font-size:11px; }
 
 .replay-stage { display:grid; grid-template-columns:1.03fr .97fr; min-height:550px; border:1px solid var(--line); background:#0f1412; }
 .github-window { position:relative; color:#1f2328; background:#fff; border-right:1px solid #303a36; overflow:hidden; }
+.showing-chat { color:var(--ink); background:#0d1210; }
+.sim-chat { height:100%; min-height:550px; display:flex; flex-direction:column; background:radial-gradient(circle at 85% 15%,rgba(182,245,66,.055),transparent 28%),#0d1210; }
+.chat-topbar { height:68px; display:flex; align-items:center; justify-content:space-between; padding:0 20px; border-bottom:1px solid #28312e; background:#121815; }
+.chat-topbar>div { display:flex; align-items:center; gap:11px; }
+.agent-mini { width:30px; height:30px; flex:0 0 auto; display:grid; place-items:center; color:#11150f; background:var(--acid); font:800 10px/1 var(--font-geist-mono); }
+.chat-topbar p { margin:0; }.chat-topbar strong,.chat-topbar small { display:block; }.chat-topbar strong { font-size:12px; }.chat-topbar small { margin-top:4px; color:#78847f; font:500 8px/1 var(--font-geist-mono); }
+.secure-session { color:#75817c; font:600 7px/1 var(--font-geist-mono); letter-spacing:.1em; display:flex; align-items:center; gap:7px; }.secure-session i { width:6px; height:6px; border-radius:50%; background:var(--acid); box-shadow:0 0 8px rgba(182,245,66,.55); }
+.chat-context { padding:15px 20px; display:flex; align-items:center; justify-content:space-between; gap:20px; border-bottom:1px solid #252e2a; background:#0f1412; }
+.chat-context span { color:#68736f; white-space:nowrap; font:600 7px/1 var(--font-geist-mono); letter-spacing:.12em; }
+.chat-context p { margin:0; color:#8f9a96; font-size:9px; line-height:1.4; }
+.chat-thread { flex:1; padding:35px 24px 24px; display:flex; flex-direction:column; }
+.assistant-bubble { display:flex; align-items:start; gap:11px; }.assistant-bubble .agent-mini { width:26px; height:26px; font-size:8px; }.assistant-bubble p { max-width:295px; margin:0; padding:11px 13px; color:#bdc7c3; background:#171e1b; border:1px solid #2b3531; font-size:11px; line-height:1.4; }
+.user-bubble { align-self:flex-end; max-width:78%; margin-top:24px; padding:14px 16px; color:#15200d; background:var(--acid); border-radius:12px 12px 2px 12px; box-shadow:0 10px 28px rgba(0,0,0,.25); }
+.user-bubble small { color:#46670b; font:700 7px/1 var(--font-geist-mono); letter-spacing:.1em; }.user-bubble p { margin:7px 0 8px; font-size:12px; line-height:1.5; font-weight:560; }.user-bubble code { color:#0c1208; background:rgba(255,255,255,.34); padding:2px 4px; font:600 10px/1 var(--font-geist-mono); }.user-bubble>span { display:block; color:#567717; font-size:8px; text-align:right; }
+.intent-card { margin-top:auto; display:grid; grid-template-columns:28px 1fr; gap:11px; align-items:start; padding:13px; color:#bcd3af; background:rgba(182,245,66,.055); border:1px solid rgba(182,245,66,.25); }
+.intent-card>span { width:26px; height:26px; display:grid; place-items:center; color:#17200f; background:var(--acid); border-radius:50%; font-weight:800; }.intent-card strong { display:block; color:var(--acid); font:700 8px/1 var(--font-geist-mono); letter-spacing:.1em; }.intent-card p { margin:6px 0 0; color:#8f9f91; font-size:9px; line-height:1.4; }
+.chat-composer { margin:0 20px 20px; min-height:47px; display:flex; align-items:center; justify-content:space-between; padding:0 8px 0 14px; color:#5f6b66; background:#151b18; border:1px solid #303a36; font-size:10px; }.chat-composer button { width:31px; height:31px; border:0; color:#11150f; background:#58635e; cursor:default; }
 .github-chrome { height:47px; display:grid; grid-template-columns:80px 1fr auto; align-items:center; padding:0 15px; color:#9aa4ad; background:#171b20; font:500 9px/1 var(--font-geist-mono); }
 .github-chrome>a { color:#c8d1d9; font-size:15px; }
 .gh-dots { display:flex; gap:6px; }
