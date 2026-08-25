@@ -219,6 +219,26 @@ footer p { color:var(--muted); font-size:11px; }
 .payload-flag { position:absolute; left:24px; right:24px; bottom:19px; z-index:5; color:#ffd0ce; background:#8a1c19; border:1px solid #ff7b77; padding:11px 14px; box-shadow:0 8px 30px rgba(0,0,0,.24); display:flex; justify-content:space-between; align-items:center; gap:20px; }
 .payload-flag span { font:700 9px/1 var(--font-geist-mono); letter-spacing:.1em; }
 .payload-flag p { margin:0; font-size:10px; }
+.showing-pr { background:#fff; }
+.pr-title { padding:20px 24px 14px; }
+.pr-title h3 { margin:0 0 11px; font-weight:430; font-size:20px; line-height:1.25; letter-spacing:-.02em; }
+.pr-title h3 small { color:#656d76; font-weight:300; }
+.pr-title p { margin:0; display:flex; align-items:center; flex-wrap:wrap; gap:5px; color:#57606a; font-size:10px; }
+.pr-title .open-badge { margin:0 4px 0 0; }
+.pr-title code { color:#0969da; background:#ddf4ff; border-radius:12px; padding:3px 7px; font:500 9px/1 var(--font-geist-mono); }
+.pr-tabs { height:40px; display:flex; align-items:end; gap:24px; padding:0 24px; border-bottom:1px solid #d0d7de; color:#57606a; font-size:10px; }
+.pr-tabs span { height:40px; display:flex; align-items:center; gap:5px; border-bottom:2px solid transparent; }
+.pr-tabs span.active { color:#1f2328; border-bottom-color:#fd8c73; font-weight:600; }
+.pr-tabs b { display:grid; place-items:center; min-width:17px; height:17px; padding:0 4px; border-radius:10px; background:#eaeef2; font-size:8px; }
+.pr-shell { padding-top:16px; padding-bottom:70px; }
+.pr-avatar { background:linear-gradient(135deg,#1f6feb,#238636); }
+.pr-body { padding:13px 17px; font-size:10px; line-height:1.38; }
+.pr-body p { margin-bottom:9px; }
+.pr-body h4 { margin:9px 0 4px; font-size:11px; }
+.pr-body ul { margin-bottom:7px; }
+.pr-body li { margin:3px 0; }
+.leaked-copy { margin-left:-4px!important; padding:5px 8px 5px 22px!important; border-left:3px solid #cf222e; background:#fff1f0; }
+.pr-leak-flag { background:#8a1c19; }
 
 .flow-canvas { position:relative; display:flex; flex-direction:column; min-width:0; background-color:#0c100f; background-image:radial-gradient(#26302d 1px,transparent 1px); background-size:18px 18px; }
 .flow-canvas-head { height:47px; display:flex; justify-content:space-between; align-items:center; padding:0 18px; color:#7f8a86; border-bottom:1px solid var(--line); background:#111614; font:600 9px/1 var(--font-geist-mono); letter-spacing:.12em; }
