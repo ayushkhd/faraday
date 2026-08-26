@@ -14,5 +14,7 @@ describe('event contract', () => {
 
   it('rejects arbitrary request fields', () => {
     expect(runRequestSchema.safeParse({ mode: 'on', source: 'replay', prompt: 'arbitrary' }).success).toBe(false);
+    expect(runRequestSchema.safeParse({ mode: 'on', source: 'replay', inputId: 'fixture' }).success).toBe(true);
+    expect(runRequestSchema.safeParse({ mode: 'on', source: 'replay', inputId: 'fixture', commentBody: 'browser supplied' }).success).toBe(false);
   });
 });

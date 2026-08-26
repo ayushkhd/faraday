@@ -1,31 +1,48 @@
 import { expect, test } from '@playwright/test';
 
-test('protected replay proves both walls and resets', async ({ page }) => {
+test('Replay compares Sandbox Off and Sandbox On side by side', async ({ page }) => {
   const pageErrors: Error[] = [];
   page.on('pageerror', (error) => pageErrors.push(error));
   await page.goto('/');
-  await expect(page.getByText('Same agent.')).toBeVisible();
-  await expect(page.getByText('REPLAY', { exact: true })).toBeVisible();
-  await page.getByRole('button', { name: /Run fixed issue/ }).click();
-  await expect(page.getByRole('heading', { name: 'Attack contained.' })).toBeVisible();
-  await expect(page.getByText('Least privilege', { exact: true })).toBeVisible();
-  await expect(page.getByText('Egress wall', { exact: true })).toBeVisible();
-  await page.getByRole('button', { name: 'Reset replay' }).click();
-  await expect(page.getByText('Machine evidence will appear here.')).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Sandbox Off' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Sandbox On' })).toBeVisible();
+  await expect(page.getByText('PUBLIC CASE REPLAY')).toBeVisible();
+  await expect(page.getByText(/ignore the operator boundary/)).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Open source comment' })).toHaveAttribute('href', /ayushkhd\/faraday\/issues\/2#issuecomment-/);
+  await expect(page.getByRole('link', { name: 'Open permanent demo issue' })).toHaveAttribute('href', /ayushkhd\/faraday\/issues\/2$/);
+  await page.getByRole('button', { name: /Run replay/i }).click();
+  await expect(page.getByRole('heading', { name: 'Demo secret leaked' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Contained · work completed' })).toBeVisible();
+  await expect(page.getByText('SIMULATED SECRET LEAK')).toBeVisible();
+  await expect(page.getByText('SIMULATED COMMENT')).toBeVisible();
+  await expect(page.getByText('EGRESS DENIED')).toBeVisible();
+  await expect(page.getByText('HARNESS POSTED RESULT')).toBeVisible();
+  await expect(page.getByText('Sandbox → one-run broker → GitHub comment')).toBeVisible();
+  await expect(page.getByText('Sandbox → local report → trusted harness → cleaned GitHub comment')).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Open permanent Replay breach reference' })).toHaveAttribute('href', 'https://github.com/ayushkhd/faraday/issues/2#issuecomment-5418864118');
+  await expect(page.getByRole('link', { name: 'Open permanent cleaned Replay reference' })).toHaveAttribute('href', 'https://github.com/ayushkhd/faraday/issues/2#issuecomment-5418864196');
+  await expect(page.locator('summary').filter({ hasText: 'triage-report.md' })).toHaveCount(2);
+  await page.getByRole('button', { name: 'Reset comparison' }).click();
+  await expect(page.getByText('Awaiting comparison')).toHaveCount(2);
   expect(pageErrors).toEqual([]);
 });
 
-test('unsafe replay shows constrained publication proof and locks controls while running', async ({ page }) => {
-  const pageErrors: Error[] = [];
-  page.on('pageerror', (error) => pageErrors.push(error));
+test('comparison recovers after refresh without a stale Replay lock', async ({ page }) => {
   await page.goto('/');
-  const unsafe = page.getByRole('button', { name: /Containment off/ });
-  await unsafe.click();
-  await expect(unsafe).toHaveAttribute('aria-pressed', 'true');
-  await page.getByRole('button', { name: /Run fixed issue/ }).click();
-  await expect(page.getByRole('button', { name: /Containment on/ })).toBeDisabled({ timeout: 1_000 });
-  await expect(page.getByRole('heading', { name: 'Boundary breached.' })).toBeVisible();
-  await expect(page.getByText('Fake canary published in a real PR')).toBeVisible();
-  await expect(page.getByText('REPLAY', { exact: true })).toBeVisible();
-  expect(pageErrors).toEqual([]);
+  await page.getByRole('button', { name: /Run replay/i }).click();
+  await expect(page.getByRole('heading', { name: 'Contained · work completed' })).toBeVisible();
+  await page.reload();
+  await page.getByRole('button', { name: /Run replay/i }).click();
+  await expect(page.getByRole('heading', { name: 'Demo secret leaked' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Contained · work completed' })).toBeVisible();
+});
+
+test('public input loader rejects non-GitHub URLs without replacing the replay case', async ({ page }) => {
+  await page.goto('/');
+  await page.getByRole('textbox', { name: 'Public GitHub issue or comment URL' }).fill('https://attacker.example/issues/1#issuecomment-2');
+  const load = page.getByRole('button', { name: 'Load input' });
+  await expect(load).toBeEnabled();
+  await load.click();
+  await expect(page.getByText(/INVALID_GITHUB_INPUT_URL/)).toBeVisible();
+  await expect(page.getByText('PUBLIC CASE REPLAY')).toBeVisible();
 });

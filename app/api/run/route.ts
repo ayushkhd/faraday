@@ -2,6 +2,7 @@ import { createReplay } from '@/lib/faraday/replay';
 import { encodeSse, runRequestSchema, type FaradayEvent } from '@/lib/faraday/events';
 import { executeLive } from '@/lib/faraday/orchestrator';
 import { validateMutationRequest } from '@/lib/faraday/http-security';
+import { getRunConflict } from '@/lib/faraday/run-store';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -14,6 +15,8 @@ export async function POST(request: Request): Promise<Response> {
   const body = await request.json().catch(() => null);
   const parsed = runRequestSchema.safeParse(body);
   if (!parsed.success) return Response.json({ error: 'INVALID_RUN_REQUEST' }, { status: 400 });
+  const conflict = getRunConflict();
+  if (conflict) return Response.json({ error: conflict }, { status: 409 });
 
   let cancelled = false;
   const disconnect = new AbortController();

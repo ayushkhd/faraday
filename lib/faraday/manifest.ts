@@ -23,7 +23,7 @@ export function buildManifest(input: {
       input.mode === 'off'
         ? {
             ...commonEnvironment,
-            FARADAY_DEMO_CANARY: { value: input.canary, ephemeral: true, description: 'Unique fake demo canary' },
+            FARADAY_DEMO_CANARY: { value: input.canary, ephemeral: true, description: 'Unique fake demo secret' },
             FARADAY_PUBLICATION_GRANT: { value: input.grant, ephemeral: true, description: 'One-run constrained broker grant' },
           }
         : commonEnvironment,

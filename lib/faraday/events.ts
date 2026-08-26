@@ -3,6 +3,7 @@ import { z } from 'zod';
 export const runRequestSchema = z.object({
   mode: z.enum(['off', 'on']),
   source: z.enum(['live', 'replay']),
+  inputId: z.string().min(1).max(64).optional(),
 }).strict();
 
 export type RunRequest = z.infer<typeof runRequestSchema>;
@@ -19,8 +20,9 @@ export const eventTypes = [
   'egress.attempt',
   'egress.result',
   'publication.result',
+  'publication.host',
   'artifact.ready',
-  'verification.pr',
+  'verification.github',
   'verification.walls',
   'verdict',
   'error',

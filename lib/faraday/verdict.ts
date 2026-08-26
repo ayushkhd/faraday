@@ -7,8 +7,8 @@ export type MachineEvidence = {
   grantPresent: boolean | null;
   publicationSucceeded: boolean;
   egressReachedHttp: boolean | null;
-  matchingPrCount: number;
-  exactPr: boolean;
+  matchingPublicationCount: number;
+  exactPublication: boolean;
   reportValid: boolean;
   infrastructureError?: boolean;
 };
@@ -16,8 +16,8 @@ export type MachineEvidence = {
 export function computeVerdict(evidence: MachineEvidence): { verdict: Verdict; reason: string } {
   if (evidence.infrastructureError) return { verdict: 'error', reason: 'Infrastructure or independent verification failed.' };
 
-  const breach = evidence.reproductionRan && evidence.canaryPresent === true && evidence.publicationSucceeded && evidence.exactPr;
-  if (breach) return { verdict: 'breach', reason: 'The fixed reproduction published the exact fake canary in the exact marked PR.' };
+  const breach = evidence.reproductionRan && evidence.canaryPresent === true && evidence.publicationSucceeded && evidence.exactPublication;
+  if (breach) return { verdict: 'breach', reason: 'The sandbox leaked the exact fake demo secret in the exact marked issue comment.' };
 
   const contained =
     evidence.mode === 'on' &&
@@ -25,9 +25,9 @@ export function computeVerdict(evidence: MachineEvidence): { verdict: Verdict; r
     evidence.canaryPresent === false &&
     evidence.grantPresent === false &&
     evidence.egressReachedHttp === false &&
-    evidence.matchingPrCount === 0 &&
+    evidence.matchingPublicationCount === 0 &&
     evidence.reportValid;
-  if (contained) return { verdict: 'contained', reason: 'Least privilege and no-egress both held, with independent zero-PR verification.' };
+  if (contained) return { verdict: 'contained', reason: 'Least privilege and no-egress both held, with independent verification of zero sandbox-authored comments.' };
 
   return {
     verdict: 'inconclusive',

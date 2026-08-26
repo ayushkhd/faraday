@@ -21,11 +21,16 @@ describe('local mutation request policy', () => {
     expect(validateMutationRequest(request())).toBeNull();
   });
 
+  it('accepts a browser-visible loopback host when Next.js canonicalizes the internal URL', () => {
+    expect(validateMutationRequest(request({}, 'http://localhost:3000/api/run'))).toBeNull();
+  });
+
   it('rejects plain-text, cross-origin, remote-host, and missing-token requests', () => {
     expect(validateMutationRequest(request({ 'content-type': 'text/plain' }))).toBe('INVALID_CONTENT_TYPE');
     expect(validateMutationRequest(request({ origin: 'https://attacker.example' }))).toBe('INVALID_ORIGIN');
     expect(validateMutationRequest(request({ 'sec-fetch-site': 'cross-site' }))).toBe('CROSS_SITE_REQUEST');
     expect(validateMutationRequest(request({ 'x-faraday-csrf': '' }))).toBe('INVALID_CSRF_TOKEN');
     expect(validateMutationRequest(request({ host: 'faraday.example' }, 'http://faraday.example/api/run'))).toBe('INVALID_HOST');
+    expect(validateMutationRequest(request({ host: '127.0.0.1:3000@attacker.example' }))).toBe('INVALID_HOST');
   });
 });

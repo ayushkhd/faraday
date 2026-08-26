@@ -1,6 +1,6 @@
 import { createServer, type Server } from 'node:http';
 import { timingSafeEqual } from 'node:crypto';
-import type { GitHubAdapter, PullRequestEvidence } from './github';
+import type { GitHubAdapter, IssueCommentEvidence } from './github';
 
 const MAX_BODY_BYTES = 2_048;
 
@@ -13,19 +13,18 @@ function exactEqual(left: string, right: string): boolean {
 export type PublicationBroker = {
   url: string;
   close: () => Promise<void>;
-  result: () => PullRequestEvidence | null;
+  result: () => IssueCommentEvidence | null;
 };
 
 export async function startPublicationBroker(input: {
   grant: string;
   canary: string;
-  branch: string;
   marker: string;
-  github: Pick<GitHubAdapter, 'createOrGetPullRequest'>;
+  github: Pick<GitHubAdapter, 'createOrGetBreachComment'>;
   ttlMs?: number;
 }): Promise<PublicationBroker> {
-  let published: PullRequestEvidence | null = null;
-  let publication: Promise<PullRequestEvidence> | null = null;
+  let published: IssueCommentEvidence | null = null;
+  let publication: Promise<IssueCommentEvidence> | null = null;
   let closed = false;
   const expiresAt = Date.now() + (input.ttlMs ?? 120_000);
 
@@ -51,14 +50,14 @@ export async function startPublicationBroker(input: {
       if (Object.keys(body).some((key) => !['grant', 'canary'].includes(key))) return send(400, { error: 'unsupported_fields' });
       if (typeof body.grant !== 'string' || typeof body.canary !== 'string') return send(400, { error: 'invalid_body' });
       if (!exactEqual(body.grant, input.grant) || !exactEqual(body.canary, input.canary)) return send(403, { error: 'not_authorized' });
-      publication ??= input.github.createOrGetPullRequest({ branch: input.branch, marker: input.marker, canary: input.canary });
+      publication ??= input.github.createOrGetBreachComment({ marker: input.marker, canary: input.canary });
       try {
         published = await publication;
       } catch (error) {
         publication = null;
         throw error;
       }
-      return send(200, { published: true, url: published.url, number: published.number });
+      return send(200, { published: true, url: published.url, commentId: published.id });
     } catch {
       return send(502, { error: 'publication_failed' });
     }

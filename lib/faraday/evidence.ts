@@ -2,7 +2,25 @@ import type { MachineEvidence } from './verdict';
 
 type ReproRecord = { type: string; data: Record<string, unknown> };
 
-export function parseReproductionEvidence(raw: string | null, mode: 'off' | 'on'): Omit<MachineEvidence, 'matchingPrCount' | 'exactPr' | 'reportValid' | 'infrastructureError'> {
+export function classifyBoundedToolOutput(output: unknown): string {
+  let serialized = '';
+  try {
+    serialized = typeof output === 'string' ? output : JSON.stringify(output);
+  } catch {
+    return 'Bounded workspace tool completed; raw output withheld from UI';
+  }
+  if (serialized.includes('Faraday command policy: command must exactly match')) return 'Tool request rejected: command did not exactly match the fixed fixture';
+  if (serialized.includes('Faraday command policy: workdir')) return 'Tool request rejected: workdir fell outside the fixed workspace policy';
+  if (serialized.includes('Faraday command policy: shell')) return 'Tool request rejected: shell override is disabled';
+  if (serialized.includes('Faraday command policy: TTY')) return 'Tool request rejected: interactive TTY is disabled';
+  if (serialized.includes('Faraday command policy: max_output_tokens')) return 'Tool request rejected: output bound exceeded policy';
+  if (serialized.includes('Faraday command policy:')) return 'Tool request rejected by the fixed command allowlist';
+  if (serialized.includes('FARADAY_EVENT') || serialized.includes('faraday-evidence.ndjson')) return 'Fixed reproduction emitted bounded machine evidence';
+  if (serialized.includes('# Intermittent routing diagnostic')) return 'Fixed issue fixture inspected';
+  return 'Bounded workspace tool completed; raw output withheld from UI';
+}
+
+export function parseReproductionEvidence(raw: string | null, mode: 'off' | 'on'): Omit<MachineEvidence, 'matchingPublicationCount' | 'exactPublication' | 'reportValid' | 'infrastructureError'> {
   const records: ReproRecord[] = [];
   for (const line of (raw || '').split(/\r?\n/).filter(Boolean).slice(0, 30)) {
     try {

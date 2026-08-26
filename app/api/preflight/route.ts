@@ -4,6 +4,7 @@ import { getGitHubConfig, getModel, missingLiveVariables } from '@/lib/faraday/c
 import { loadFixtures } from '@/lib/faraday/fixtures';
 import { GitHubAdapter } from '@/lib/faraday/github';
 import { getCsrfToken } from '@/lib/faraday/http-security';
+import { getFixtureInput } from '@/lib/faraday/comment-input';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -12,18 +13,25 @@ const exec = promisify(execFile);
 
 async function dockerReadiness() {
   try {
-    await exec('docker', ['image', 'inspect', 'node:22-bookworm-slim'], { timeout: 5_000 });
+    await exec('docker', ['--version'], { timeout: 1_500 });
+  } catch (error) {
+    const code = (error as NodeJS.ErrnoException).code;
+    return code === 'ENOENT'
+      ? { installed: false, daemon: false, image: false, reason: 'DOCKER_NOT_INSTALLED' }
+      : { installed: true, daemon: false, image: false, reason: 'DOCKER_DAEMON_UNAVAILABLE' };
+  }
+
+  try {
+    await exec('docker', ['version', '--format', '{{.Server.Version}}'], { timeout: 1_500 });
+  } catch {
+    return { installed: true, daemon: false, image: false, reason: 'DOCKER_DAEMON_UNAVAILABLE' };
+  }
+
+  try {
+    await exec('docker', ['image', 'inspect', 'node:22-bookworm-slim'], { timeout: 1_500 });
     return { installed: true, daemon: true, image: true, reason: null };
   } catch {
-    try {
-      await exec('docker', ['version', '--format', '{{.Server.Version}}'], { timeout: 5_000 });
-      return { installed: true, daemon: true, image: false, reason: 'DOCKER_IMAGE_MISSING' };
-    } catch (second) {
-      const code = (second as NodeJS.ErrnoException).code;
-      return code === 'ENOENT'
-        ? { installed: false, daemon: false, image: false, reason: 'DOCKER_NOT_INSTALLED' }
-        : { installed: true, daemon: false, image: false, reason: 'DOCKER_DAEMON_UNAVAILABLE' };
-    }
+    return { installed: true, daemon: true, image: false, reason: 'DOCKER_IMAGE_MISSING' };
   }
 }
 
@@ -34,18 +42,20 @@ export async function GET(): Promise<Response> {
   ]);
   const missing = missingLiveVariables();
   const githubConfig = getGitHubConfig();
-  let github = { configured: Boolean(githubConfig), reachable: false, seedRef: false, reason: githubConfig ? null : 'GITHUB_CONFIG_MISSING' as string | null };
+  let github = { configured: Boolean(githubConfig), reachable: false, demoIssue: false, issueUrl: null as string | null, reason: githubConfig ? null : 'GITHUB_CONFIG_MISSING' as string | null };
   if (githubConfig) {
     try {
-      await new GitHubAdapter(githubConfig).checkSeed();
-      github = { configured: true, reachable: true, seedRef: true, reason: null };
+      const adapter = new GitHubAdapter(githubConfig);
+      await adapter.checkDemoIssue();
+      github = { configured: true, reachable: true, demoIssue: true, issueUrl: adapter.issueUrl(), reason: null };
     } catch {
-      github = { configured: true, reachable: false, seedRef: false, reason: 'GITHUB_SEED_UNREACHABLE' };
+      github = { configured: true, reachable: false, demoIssue: false, issueUrl: null, reason: 'GITHUB_DEMO_ISSUE_UNREACHABLE' };
     }
   }
   const sharedReady = missing.length === 0 && github.reachable && fixtures.ready;
   return Response.json({
     csrfToken: getCsrfToken(),
+    defaultInput: getFixtureInput(),
     model: getModel(),
     openai: { configured: Boolean(process.env.OPENAI_API_KEY), reason: process.env.OPENAI_API_KEY ? null : 'OPENAI_API_KEY_MISSING' },
     github,

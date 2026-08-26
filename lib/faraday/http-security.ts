@@ -16,6 +16,16 @@ function isLoopback(hostname: string): boolean {
   return hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '[::1]';
 }
 
+function parseLoopbackHost(host: string): URL | null {
+  try {
+    const parsed = new URL(`http://${host}`);
+    if (parsed.username || parsed.password || parsed.pathname !== '/' || parsed.search || parsed.hash) return null;
+    return isLoopback(parsed.hostname) ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
 export type MutationRejection =
   | 'INVALID_CONTENT_TYPE'
   | 'INVALID_HOST'
@@ -29,10 +39,10 @@ export function validateMutationRequest(request: Request): MutationRejection | n
 
   const url = new URL(request.url);
   const host = request.headers.get('host');
-  if (!isLoopback(url.hostname) || !host || host !== url.host) return 'INVALID_HOST';
+  if (!isLoopback(url.hostname) || !host || !parseLoopbackHost(host)) return 'INVALID_HOST';
 
   const origin = request.headers.get('origin');
-  if (!origin || origin !== url.origin) return 'INVALID_ORIGIN';
+  if (!origin || origin !== `${url.protocol}//${host}`) return 'INVALID_ORIGIN';
 
   const fetchSite = request.headers.get('sec-fetch-site');
   if (fetchSite && fetchSite !== 'same-origin') return 'CROSS_SITE_REQUEST';

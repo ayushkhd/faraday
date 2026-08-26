@@ -1,114 +1,184 @@
 'use client';
 
-import { useEffect, useMemo, useReducer, useState } from 'react';
+import { useEffect, useReducer, useState, type Dispatch } from 'react';
+import { AgentLane } from '@/components/faraday/agent-lane';
 import { IssuePanel } from '@/components/faraday/issue-panel';
-import { OutcomePanel } from '@/components/faraday/outcome-panel';
 import { ReadinessPanel } from '@/components/faraday/readiness-panel';
-import { RunTimeline } from '@/components/faraday/run-timeline';
+import type { CommentInput } from '@/lib/faraday/comment-input';
+import { experienceReducer, initialExperienceState, type ExperienceAction, type Preflight } from '@/lib/faraday/client-state';
 import type { FaradayEvent, RunRequest } from '@/lib/faraday/events';
-import { experienceReducer, initialExperienceState, type Preflight } from '@/lib/faraday/client-state';
+
+async function responseError(response: Response, label: string): Promise<Error> {
+  const payload = await response.json().catch(() => null) as { error?: unknown } | null;
+  const code = typeof payload?.error === 'string' ? payload.error : null;
+  if (code === 'PUBLIC_COMMENT_NOT_FOUND') {
+    return new Error('GitHub did not find that exact issue comment. It may have been deleted; paste its current permalink. (PUBLIC_COMMENT_NOT_FOUND)');
+  }
+  if (code === 'PUBLIC_GITHUB_RATE_LIMITED') {
+    return new Error('GitHub temporarily rate-limited the public comment lookup. Retry after the limit resets. (PUBLIC_GITHUB_RATE_LIMITED)');
+  }
+  return new Error(`${label} returned ${response.status}${code ? ` (${code})` : ''}.`);
+}
+
+async function runLane(request: RunRequest, csrfToken: string, dispatch: Dispatch<ExperienceAction>): Promise<string> {
+  dispatch({ type: 'start' });
+  const response = await fetch('/api/run', { method: 'POST', headers: { 'content-type': 'application/json', 'x-faraday-csrf': csrfToken }, body: JSON.stringify(request) });
+  if (!response.ok) throw await responseError(response, 'Run endpoint');
+  if (!response.body) throw new Error('Run endpoint returned an empty stream.');
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let pending = '';
+  let runId = '';
+  while (true) {
+    const { value, done } = await reader.read();
+    pending += decoder.decode(value, { stream: !done });
+    const blocks = pending.split(/\r?\n\r?\n/);
+    pending = blocks.pop() || '';
+    for (const block of blocks) {
+      const dataLine = block.split(/\r?\n/).find((line) => line.startsWith('data: '));
+      if (!dataLine) continue;
+      const event = JSON.parse(dataLine.slice(6)) as FaradayEvent;
+      runId = event.runId;
+      dispatch({ type: 'event', event });
+    }
+    if (done) break;
+  }
+  if (!runId) throw new Error('Run completed without an identifier.');
+  return runId;
+}
+
+async function cleanupRun(runId: string, csrfToken: string, allowMissing = false): Promise<void> {
+  const response = await fetch('/api/reset', { method: 'POST', headers: { 'content-type': 'application/json', 'x-faraday-csrf': csrfToken }, body: JSON.stringify({ runId }) });
+  if (!response.ok && !(allowMissing && response.status === 404)) throw await responseError(response, 'Cleanup');
+}
 
 export default function Home() {
-  const [mode, setMode] = useState<RunRequest['mode']>('on');
   const [source, setSource] = useState<RunRequest['source']>('replay');
   const [preflight, setPreflight] = useState<Preflight | null>(null);
-  const [state, dispatch] = useReducer(experienceReducer, initialExperienceState);
-  const busy = ['preparing', 'running', 'verifying', 'resetting'].includes(state.phase);
-  const laneReady = Boolean(preflight?.lanes[mode][source]);
-  const fingerprint = preflight?.replay.ready ? 'SHA-256 verified at preflight' : 'Awaiting fixture verification';
+  const [input, setInput] = useState<CommentInput | null>(null);
+  const [commentUrl, setCommentUrl] = useState('');
+  const [inputLoading, setInputLoading] = useState(false);
+  const [inputError, setInputError] = useState<string | null>(null);
+  const [comparisonBusy, setComparisonBusy] = useState(false);
+  const [comparisonError, setComparisonError] = useState<string | null>(null);
+  const [runIds, setRunIds] = useState<string[]>([]);
+  const [unsafeState, unsafeDispatch] = useReducer(experienceReducer, initialExperienceState);
+  const [safeState, safeDispatch] = useReducer(experienceReducer, initialExperienceState);
 
   useEffect(() => {
     let active = true;
-    fetch('/api/preflight', { cache: 'no-store' }).then((response) => response.json()).then((data: Preflight) => { if (active) setPreflight(data); }).catch(() => { if (active) setPreflight(null); });
+    fetch('/api/preflight', { cache: 'no-store' }).then((response) => response.json()).then((data: Preflight) => {
+      if (active) {
+        setPreflight(data);
+        setInput((current) => current || data.defaultInput);
+        setCommentUrl((current) => current || data.defaultInput.url || '');
+      }
+    }).catch(() => { if (active) setPreflight(null); });
     return () => { active = false; };
   }, []);
 
-  const latestWalls = useMemo(() => [...state.events].reverse().find((event) => event.type === 'verification.walls'), [state.events]);
+  const comparisonReady = Boolean(input && preflight?.lanes.off[source] && preflight?.lanes.on[source]);
+  const hasResults = Boolean(unsafeState.events.length || safeState.events.length || comparisonError);
 
-  async function run() {
-    dispatch({ type: 'start' });
+  async function loadComment() {
+    if (!preflight?.csrfToken) return setInputError('Local approval token unavailable. Refresh and retry.');
+    setInputLoading(true);
+    setInputError(null);
     try {
-      if (!preflight?.csrfToken) throw new Error('Local approval token is unavailable. Refresh preflight and try again.');
-      const response = await fetch('/api/run', { method: 'POST', headers: { 'content-type': 'application/json', 'x-faraday-csrf': preflight.csrfToken }, body: JSON.stringify({ mode, source }) });
-      if (!response.ok || !response.body) throw new Error(`Run endpoint returned ${response.status}.`);
-      const reader = response.body.getReader();
-      const decoder = new TextDecoder();
-      let pending = '';
-      while (true) {
-        const { value, done } = await reader.read();
-        pending += decoder.decode(value, { stream: !done });
-        const blocks = pending.split(/\r?\n\r?\n/);
-        pending = blocks.pop() || '';
-        for (const block of blocks) {
-          const dataLine = block.split(/\r?\n/).find((line) => line.startsWith('data: '));
-          if (dataLine) dispatch({ type: 'event', event: JSON.parse(dataLine.slice(6)) as FaradayEvent });
-        }
-        if (done) break;
-      }
+      const response = await fetch('/api/comment', { method: 'POST', headers: { 'content-type': 'application/json', 'x-faraday-csrf': preflight.csrfToken }, body: JSON.stringify({ url: commentUrl.trim() }) });
+      if (!response.ok) throw await responseError(response, 'Comment loader');
+      setInput(await response.json() as CommentInput);
     } catch (error) {
-      dispatch({ type: 'failure', message: error instanceof Error ? error.message : 'Unable to run Faraday.' });
+      setInputError(error instanceof Error ? error.message : 'Unable to load the public comment.');
+    } finally {
+      setInputLoading(false);
     }
   }
 
-  async function reset() {
-    if (!state.runId) return dispatch({ type: 'clear' });
-    dispatch({ type: 'resetting' });
+  async function runComparison() {
+    if (!input || !preflight?.csrfToken || !comparisonReady) return;
+    setComparisonBusy(true);
+    setComparisonError(null);
+    unsafeDispatch({ type: 'clear' });
+    safeDispatch({ type: 'clear' });
+    const base = { source, inputId: input.id } as const;
+    const nextRunIds: string[] = [];
+    let unsafeDone = false;
+    let safeDone = false;
     try {
-      if (!preflight?.csrfToken) throw new Error('Local approval token is unavailable. Refresh preflight and try again.');
-      const response = await fetch('/api/reset', { method: 'POST', headers: { 'content-type': 'application/json', 'x-faraday-csrf': preflight.csrfToken }, body: JSON.stringify({ runId: state.runId }) });
-      if (!response.ok) throw new Error(`Reset returned ${response.status}.`);
-      dispatch({ type: 'clear' });
-    } catch (error) { dispatch({ type: 'failure', message: error instanceof Error ? error.message : 'Reset failed.' }); }
+      if (runIds.length) await Promise.all(runIds.map((runId) => cleanupRun(runId, preflight.csrfToken, true)));
+      setRunIds([]);
+      const unsafeRunId = await runLane({ ...base, mode: 'off' }, preflight.csrfToken, unsafeDispatch);
+      unsafeDone = true;
+      nextRunIds.push(unsafeRunId);
+      setRunIds([...nextRunIds]);
+      const safeRunId = await runLane({ ...base, mode: 'on' }, preflight.csrfToken, safeDispatch);
+      safeDone = true;
+      nextRunIds.push(safeRunId);
+      setRunIds([...nextRunIds]);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Comparison failed.';
+      setComparisonError(message);
+      if (!unsafeDone) unsafeDispatch({ type: 'failure', message });
+      if (!safeDone) safeDispatch({ type: 'failure', message });
+    } finally {
+      setComparisonBusy(false);
+    }
   }
 
-  async function runAgain() {
-    if (!state.runId) return void run();
-    dispatch({ type: 'resetting' });
+  async function resetComparison() {
+    if (!preflight?.csrfToken || comparisonBusy) return;
+    setComparisonBusy(true);
+    setComparisonError(null);
+    unsafeDispatch({ type: 'resetting' });
+    safeDispatch({ type: 'resetting' });
     try {
-      if (!preflight?.csrfToken) throw new Error('Local approval token is unavailable. Refresh preflight and try again.');
-      const response = await fetch('/api/reset', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json', 'x-faraday-csrf': preflight.csrfToken },
-        body: JSON.stringify({ runId: state.runId }),
-      });
-      if (!response.ok) throw new Error(`Reset returned ${response.status}.`);
-      dispatch({ type: 'clear' });
-      await run();
+      await Promise.all(runIds.map((runId) => cleanupRun(runId, preflight.csrfToken, true)));
+      setRunIds([]);
+      unsafeDispatch({ type: 'clear' });
+      safeDispatch({ type: 'clear' });
     } catch (error) {
-      dispatch({ type: 'failure', message: error instanceof Error ? error.message : 'Unable to reset before rerun.' });
+      setComparisonError(error instanceof Error ? error.message : 'Targeted cleanup failed.');
+    } finally {
+      setComparisonBusy(false);
     }
   }
 
   return (
     <main id="top">
       <nav className="topbar" aria-label="Faraday navigation">
-        <a className="wordmark" href="#top"><span className="mark">F</span><span>FARADAY</span></a><p>Agent containment demonstrator</p>
-        <div className="top-status"><span className={`source-badge ${source}`}>{source.toUpperCase()}</span><span className="version">SDK 0.17.0 · BETA</span></div>
+        <a className="wordmark" href="#top">FARADAY</a>
+        <p>Same agent. Same attack. Different blast radius.</p>
+        <div className="top-actions">
+          <div className="source-switch" aria-label="Run source">{(['live', 'replay'] as const).map((item) => <button key={item} disabled={comparisonBusy} className={source === item ? 'active' : ''} aria-pressed={source === item} onClick={() => setSource(item)}>{item}</button>)}</div>
+          <span className="model-pill">{preflight?.model || 'MODEL'}</span>
+          <button className="compare-button" disabled={comparisonBusy || !comparisonReady} onClick={() => void runComparison()}>{comparisonBusy ? <><span className="spinner" /> Running comparison</> : source === 'live' ? '▷ Run live comparison' : '▷ Run replay'}</button>
+        </div>
       </nav>
 
-      <section className="hero-shell">
-        <header className="hero-copy"><p className="eyebrow"><span /> TRUST BOUNDARIES, MADE VISIBLE</p><h1>Same agent.<br /><em>Different blast radius.</em></h1><p className="lede">Faraday runs one fixed triage agent across two workspace boundaries. The unsafe lane can publish a fake canary. The protected lane proves least privilege and zero egress.</p></header>
-        <ReadinessPanel preflight={preflight} />
+      <ReadinessPanel preflight={preflight} />
+      <IssuePanel input={input} url={commentUrl} loading={inputLoading} error={inputError} disabled={comparisonBusy || !preflight} onUrlChange={setCommentUrl} onLoad={() => void loadComment()} onUseFixture={() => { if (preflight) { setInput(preflight.defaultInput); setInputError(null); } }} />
+
+      {source === 'live' && preflight?.github.issueUrl ? <div className="live-disclosure" role="status"><strong>LIVE WRITES ENABLED</strong><span>Run posts one fixed breach proof and one trusted-harness containment result to the dedicated issue.</span><a href={preflight.github.issueUrl} target="_blank" rel="noreferrer">Open target issue ↗</a></div> : null}
+
+      {!comparisonReady && preflight ? <p className="readiness-note" role="status">{source === 'live' ? 'Live comparison needs OpenAI, GitHub, and Docker ready. Switch to Replay for the deterministic walkthrough.' : 'Restore the included fixture to run Replay.'}</p> : null}
+      {comparisonError ? <p className="comparison-error" role="alert">{comparisonError}</p> : null}
+
+      <section className="comparison-shell" aria-label="Agent sandbox comparison">
+        <div className="same-rail" aria-hidden="true"><span>SAME AGENT</span><span>SAME TASK</span><span>SAME INPUT</span></div>
+        <AgentLane mode="off" state={unsafeState} active={comparisonBusy && !unsafeState.verdict} />
+        <AgentLane mode="on" state={safeState} active={comparisonBusy && !safeState.verdict} />
       </section>
 
-      <section className="control-deck" aria-labelledby="control-title">
-        <div className="control-head"><div><p className="section-index">01 / BOUNDARY</p><h2 id="control-title">Choose the containment policy.</h2></div><div className="source-switch" aria-label="Run source">{(['live', 'replay'] as const).map((item) => <button key={item} disabled={busy} className={source === item ? 'active' : ''} onClick={() => setSource(item)}>{item}</button>)}</div></div>
-        <div className="lane-switch" aria-label="Containment mode">
-          <button className={mode === 'off' ? 'active unsafe' : ''} disabled={busy} onClick={() => setMode('off')} aria-pressed={mode === 'off'}><span className="lane-number">A</span><span><strong>Containment off</strong><small>Unix-local · canary + constrained grant</small></span><i>UNSAFE</i></button>
-          <button className={mode === 'on' ? 'active protected' : ''} disabled={busy} onClick={() => setMode('on')} aria-pressed={mode === 'on'}><span className="lane-number">B</span><span><strong>Containment on</strong><small>Docker · no sensitive values · no egress</small></span><i>PROTECTED</i></button>
-        </div>
-        <div className="boundary-strip"><div><small>EXECUTOR</small><strong>{mode === 'on' ? 'DOCKER' : 'UNIX-LOCAL'}</strong></div><div><small>NETWORK</small><strong>{mode === 'on' ? 'NONE' : 'HOST'}</strong></div><div><small>CANARY</small><strong>{mode === 'on' ? 'ABSENT' : 'FAKE / UNIQUE'}</strong></div><div><small>PUBLICATION</small><strong>{mode === 'on' ? 'NO GRANT' : 'ONE RUN'}</strong></div><button className="run-button" onClick={run} disabled={busy || !laneReady}>{busy ? <><span className="spinner" /> Running</> : <>Run fixed issue <span>→</span></>}</button></div>
-        {preflight && !laneReady ? <p className="readiness-note" role="status">This {source === 'live' ? 'Live' : 'Replay'} lane is not ready. {source === 'live' ? 'Switch to Replay, or complete the missing local prerequisites in README.' : 'Restore the fixed fixtures and refresh preflight.'}</p> : null}
+      <section className="config-diff">
+        <div><span className="diff-icon">≠</span><strong>Configuration diff <small>(only)</small></strong></div>
+        <p className="removed">− network: host<br />− demo secret + grant: present</p>
+        <p className="added">+ network: none<br />+ demo secret + grant: omitted</p>
+        <p>Off: sandbox reaches broker. On: sandbox has no egress; harness publishes only validated output.</p>
+        {hasResults ? <button type="button" onClick={() => void resetComparison()} disabled={comparisonBusy}>{comparisonBusy ? 'Resetting…' : 'Reset comparison'}</button> : null}
       </section>
 
-      <section className="workspace-grid">
-        <IssuePanel fingerprint={fingerprint} />
-        <RunTimeline state={state} />
-      </section>
-
-      <OutcomePanel state={state} source={source} latestWalls={latestWalls} busy={busy} onReset={() => void reset()} onRunAgain={() => void runAgain()} />
-
-      <footer><div className="wordmark"><span className="mark">F</span><span>FARADAY</span></div><p>A local-first containment demonstrator. Fake canary. Real boundary. No hidden reasoning.</p><a href="https://developers.openai.com/api/docs/guides/agents/sandboxes" target="_blank" rel="noreferrer">Sandbox Agents docs ↗</a></footer>
+      <footer><span>FARADAY</span><p>Built with Codex · OpenAI Sandbox Agents SDK · demo-safe public inputs only</p><a href="https://developers.openai.com/api/docs/guides/agents/sandboxes" target="_blank" rel="noreferrer">Sandbox Agents docs ↗</a></footer>
     </main>
   );
 }

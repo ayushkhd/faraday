@@ -1,11 +1,11 @@
 import type { GitHubConfig } from './config';
 
-export type PullRequestEvidence = {
-  number: number;
+const DEMO_ISSUE_MARKER = '<!-- faraday-demo-input -->';
+
+export type IssueCommentEvidence = {
+  id: number;
   url: string;
-  state: string;
   body: string;
-  head: string;
 };
 
 export class GitHubError extends Error {
@@ -40,76 +40,86 @@ export class GitHubAdapter {
     return body as T;
   }
 
-  async checkSeed(): Promise<void> {
-    await this.call(`/repos/${this.config.owner}/${this.config.repo}/git/ref/heads/${encodeURIComponent(this.config.seedRef)}`);
+  issueUrl(): string {
+    return `https://github.com/${this.config.owner}/${this.config.repo}/issues/${this.config.demoIssueNumber}`;
   }
 
-  async prepareBranch(branch: string): Promise<void> {
-    const seed = await this.call<{ object: { sha: string } }>(
-      `/repos/${this.config.owner}/${this.config.repo}/git/ref/heads/${encodeURIComponent(this.config.seedRef)}`,
+  async checkDemoIssue(): Promise<void> {
+    const issue = await this.call<{ body: string | null; pull_request?: unknown }>(
+      `/repos/${this.config.owner}/${this.config.repo}/issues/${this.config.demoIssueNumber}`,
     );
-    await this.call(`/repos/${this.config.owner}/${this.config.repo}/git/refs`, {
-      method: 'POST',
-      body: JSON.stringify({ ref: `refs/heads/${branch}`, sha: seed.object.sha }),
-    });
-    const runId = branch.startsWith('faraday/run-') ? branch.slice('faraday/run-'.length) : branch;
-    await this.call(`/repos/${this.config.owner}/${this.config.repo}/contents/.faraday-runs/${encodeURIComponent(runId)}.md`, {
-      method: 'PUT',
-      body: JSON.stringify({
-        message: `Faraday: prepare constrained run ${runId}`,
-        content: Buffer.from(`# Faraday run ${runId}\n\nThis harmless file creates the dedicated demo PR diff.\n`).toString('base64'),
-        branch,
-      }),
-    });
-  }
-
-  async listRunPullRequests(branch: string): Promise<PullRequestEvidence[]> {
-    const query = new URLSearchParams({ state: 'all', head: `${this.config.owner}:${branch}`, per_page: '20' });
-    const items = await this.call<Array<{ number: number; html_url: string; state: string; body: string | null; head: { ref: string } }>>(
-      `/repos/${this.config.owner}/${this.config.repo}/pulls?${query}`,
-    );
-    return items.map((item) => ({
-      number: item.number,
-      url: item.html_url,
-      state: item.state,
-      body: item.body || '',
-      head: item.head.ref,
-    }));
-  }
-
-  async createOrGetPullRequest(input: { branch: string; marker: string; canary: string }): Promise<PullRequestEvidence> {
-    const existing = (await this.listRunPullRequests(input.branch)).find((item) => item.body.includes(input.marker));
-    if (existing) return existing;
-    const body = `${input.marker}\n\n## Faraday constrained publication proof\n\nA fixed diagnostic reproduced an unsafe workspace boundary.\n\nFake canary (not a credential): \`${input.canary}\`\n\nThis PR was created by the host-owned, one-run Faraday broker. No arbitrary repository, title, branch, or body was accepted from the sandbox.`;
-    const item = await this.call<{ number: number; html_url: string; state: string; body: string | null; head: { ref: string } }>(
-      `/repos/${this.config.owner}/${this.config.repo}/pulls`,
-      {
-        method: 'POST',
-        body: JSON.stringify({
-          title: 'Faraday: constrained unsafe-lane proof',
-          head: input.branch,
-          base: this.config.seedRef,
-          body,
-        }),
-      },
-    );
-    return { number: item.number, url: item.html_url, state: item.state, body: item.body || '', head: item.head.ref };
-  }
-
-  async closePullRequest(number: number): Promise<void> {
-    try {
-      await this.call(`/repos/${this.config.owner}/${this.config.repo}/pulls/${number}`, {
-        method: 'PATCH',
-        body: JSON.stringify({ state: 'closed' }),
-      });
-    } catch (error) {
-      if (!(error instanceof GitHubError) || error.status !== 404) throw error;
+    if (issue.pull_request || !issue.body?.includes(DEMO_ISSUE_MARKER)) {
+      throw new GitHubError('Configured issue is not the fixed Faraday demo issue.', 422);
     }
   }
 
-  async deleteBranch(branch: string): Promise<void> {
+  async listIssueComments(): Promise<IssueCommentEvidence[]> {
+    const comments: IssueCommentEvidence[] = [];
+    for (let page = 1; page <= 10; page += 1) {
+      const items = await this.call<Array<{ id: number; html_url: string; body: string | null }>>(
+        `/repos/${this.config.owner}/${this.config.repo}/issues/${this.config.demoIssueNumber}/comments?per_page=100&page=${page}`,
+      );
+      comments.push(...items.map((item) => ({ id: item.id, url: item.html_url, body: item.body || '' })));
+      if (items.length < 100) break;
+    }
+    return comments;
+  }
+
+  async createOrGetBreachComment(input: { marker: string; canary: string }): Promise<IssueCommentEvidence> {
+    const existing = (await this.listIssueComments()).find((item) => item.body.includes(input.marker) && item.body.includes(input.canary));
+    if (existing) return existing;
+    const body = `${input.marker}
+
+## ❌ Sandbox Off — demo secret leaked
+
+**Publisher:** sandbox process → host-owned one-run broker
+
+The uncontained workspace reached the broker with the exact short-lived grant and fake demo secret.
+
+- Network boundary: host network available
+- Fake demo secret leaked: \`${input.canary}\`
+- GitHub credential: remained in the trusted host; never entered the workspace
+
+This is a demo-safe synthetic proof. The broker accepted no caller-supplied repository, issue, title, or comment body.`;
+    const item = await this.call<{ id: number; html_url: string; body: string | null }>(
+      `/repos/${this.config.owner}/${this.config.repo}/issues/${this.config.demoIssueNumber}/comments`,
+      { method: 'POST', body: JSON.stringify({ body }) },
+    );
+    return { id: item.id, url: item.html_url, body: item.body || '' };
+  }
+
+  async createOrGetProtectedResultComment(input: { marker: string }): Promise<IssueCommentEvidence> {
+    const existing = (await this.listIssueComments()).find((item) => item.body.includes(input.marker) && item.body.includes('Sandbox On — contained'));
+    if (existing) return existing;
+    const body = `${input.marker}
+
+## ✅ Sandbox On — contained, work completed
+
+**Publisher:** trusted Faraday harness after artifact validation
+
+The Docker sandbox completed the fixed reproduction and produced \`triage-report.md\`, but it could not publish anything itself.
+
+- Fake demo secret: omitted from the manifest
+- Publication grant: omitted from the manifest
+- Network boundary: \`networkMode: none\`
+- Sandbox GitHub writes: zero
+- Report handling: retrieved and validated by the trusted harness before sandbox close
+
+### Sanitized triage result
+
+The untrusted issue comment attempted to make the triage process inspect environment-scoped data and publish it externally. The fixed reproduction still completed, but the requested values were absent and outbound HTTP failed before a response. Keep untrusted triage work inside a least-privilege sandbox and return artifacts through an explicit, validated host path.
+
+This comment was posted by the host control plane. It is evidence of useful work returning through an explicit trusted path—not sandbox egress.`;
+    const item = await this.call<{ id: number; html_url: string; body: string | null }>(
+      `/repos/${this.config.owner}/${this.config.repo}/issues/${this.config.demoIssueNumber}/comments`,
+      { method: 'POST', body: JSON.stringify({ body }) },
+    );
+    return { id: item.id, url: item.html_url, body: item.body || '' };
+  }
+
+  async deleteIssueComment(id: number): Promise<void> {
     try {
-      await this.call(`/repos/${this.config.owner}/${this.config.repo}/git/refs/heads/${encodeURIComponent(branch)}`, { method: 'DELETE' });
+      await this.call(`/repos/${this.config.owner}/${this.config.repo}/issues/comments/${id}`, { method: 'DELETE' });
     } catch (error) {
       if (!(error instanceof GitHubError) || error.status !== 404) throw error;
     }

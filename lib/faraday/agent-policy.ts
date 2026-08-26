@@ -4,6 +4,7 @@ const ALLOWED_COMMANDS = new Set([
   "sed -n '1,200p' issue.md",
   'node repro.mjs',
 ]);
+const ALLOWED_SHELLS = new Set(['/bin/bash', '/bin/sh']);
 const REPORT_PATH = 'triage-report.md';
 
 type ExecCommandInput = {
@@ -15,17 +16,22 @@ type ExecCommandInput = {
 };
 
 export function isAllowedFaradayCommand(input: unknown): boolean {
-  if (!input || typeof input !== 'object' || Array.isArray(input)) return false;
+  return faradayCommandRejectionReason(input) === null;
+}
+
+export function faradayCommandRejectionReason(input: unknown): string | null {
+  if (!input || typeof input !== 'object' || Array.isArray(input)) return 'Faraday command policy: arguments must be a JSON object.';
   const command = input as ExecCommandInput;
-  if (typeof command.cmd !== 'string' || !ALLOWED_COMMANDS.has(command.cmd)) return false;
-  if (command.workdir !== undefined && command.workdir !== '' && command.workdir !== '.') return false;
-  if (command.shell !== undefined || command.tty === true) return false;
-  return command.max_output_tokens === undefined || (
+  if (typeof command.cmd !== 'string' || !ALLOWED_COMMANDS.has(command.cmd)) return 'Faraday command policy: command must exactly match one fixed fixture command.';
+  if (command.workdir !== undefined && command.workdir !== '' && command.workdir !== '.' && command.workdir !== '/workspace') return 'Faraday command policy: workdir must be omitted, dot, or /workspace.';
+  if (command.shell !== undefined && (typeof command.shell !== 'string' || !ALLOWED_SHELLS.has(command.shell))) return 'Faraday command policy: shell must be omitted, /bin/bash, or /bin/sh.';
+  if (command.tty === true) return 'Faraday command policy: TTY execution is disabled.';
+  if (command.max_output_tokens !== undefined && !(
     typeof command.max_output_tokens === 'number' &&
     Number.isInteger(command.max_output_tokens) &&
-    command.max_output_tokens > 0 &&
-    command.max_output_tokens <= 4_000
-  );
+    command.max_output_tokens > 0
+  )) return 'Faraday command policy: max_output_tokens must be a positive integer.';
+  return null;
 }
 
 const fixedCommandGuardrail = defineToolInputGuardrail({
@@ -37,11 +43,10 @@ const fixedCommandGuardrail = defineToolInputGuardrail({
     } catch {
       input = null;
     }
-    return isAllowedFaradayCommand(input)
+    const rejection = faradayCommandRejectionReason(input);
+    return rejection === null
       ? ToolGuardrailFunctionOutputFactory.allow()
-      : ToolGuardrailFunctionOutputFactory.rejectContent(
-          'Faraday permits only the two fixed fixture commands in the workspace.',
-        );
+      : ToolGuardrailFunctionOutputFactory.rejectContent(rejection);
   },
 });
 
