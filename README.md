@@ -2,7 +2,7 @@
 
 Faraday is a local-first OpenAI Sandbox Agents demonstrator: one security-triage agent processes the same bounded, untrusted GitHub issue comment and fixed reproduction in two execution boundaries shown side by side.
 
-- **Sandbox Off:** `UnixLocalSandboxClient` receives a unique fake canary and a one-run publication grant. Unix-local is visibly labeled as a local executor, not a security boundary. The fixed script can ask a trusted host broker to publish one fixed breach comment to the demo issue.
+- **Sandbox Off:** `UnixLocalSandboxClient` receives a unique fake demo secret and a one-run publication grant. Unix-local is visibly labeled as a local executor, not a security boundary. The fixed script can ask a trusted host broker to publish one fixed breach comment to the demo issue.
 - **Sandbox On:** `DockerSandboxClient({ image: 'node:22-bookworm-slim', networkMode: 'none' })` receives neither value. The reproduction still runs and the agent still writes `triage-report.md`, but the sandbox cannot publish. After validation, the trusted harness posts a fixed, sanitized containment result to the same issue.
 
 Both lanes use the same `SandboxAgent`, instructions, command allowlist, capabilities, issue, and script. Only the manifest and sandbox client change. Verdicts come from machine evidence and an independent host-side GitHub query—not from the model’s claims.
@@ -14,9 +14,9 @@ Both lanes use the same `SandboxAgent`, instructions, command allowlist, capabil
 | Agents SDK run and workspace | Real in Live | `@openai/agents@0.17.0`, explicit session ownership, streamed run, artifact retrieval before close. |
 | Protected egress wall | Real in Live | Local Docker with `networkMode: 'none'`. |
 | GitHub issue comments | Real in Live | Unsafe proof is broker-mediated; protected result is posted by the trusted harness after report validation. |
-| Canary | Fake | Unique `FARADAY_DEMO_CANARY_fd_<runId>` value with no authority. It is never a real credential. |
+| Demo secret | Fake | Unique `FARADAY_DEMO_SECRET_fd_<runId>` value with no authority. It is never a real credential. |
 | GitHub authority | Real but host-only | The PAT remains in trusted Node process memory and is never materialized into either workspace. |
-| Publication ability | Constrained | A short-lived broker accepts only the exact run grant/canary and ignores all target/content choices. |
+| Publication ability | Constrained | A short-lived broker accepts only the exact run grant and fake demo secret and ignores all target/content choices. |
 | Issue or comment | Real public input or bundled replay case | A public `github.com` issue or issue-comment URL is fetched without credentials, bounded to 6 KiB, cached for 30 minutes, and supplied identically to both runs. |
 | Reproduction | Fixed fixture | `repro.mjs` remains versioned and immutable; pasted inputs cannot change commands, manifests, or publication targets. |
 | Replay | Labeled simulation | Same schemas and UI reducer, deterministic timing, no API key, PAT, Docker, or side effect. |
@@ -43,7 +43,7 @@ https://github.com/owner/repo/issues/184#issuecomment-123456
 
 The trusted host fetches the issue or comment through GitHub’s public API without `GITHUB_PAT`, rejects redirects and non-GitHub hosts, limits the body to 6 KiB, rejects token-shaped credential material, and returns a short-lived input ID. The browser never supplies untrusted text to `/api/run`; both lanes resolve the same cached server-side value.
 
-Replay defaults to the permanent demo-safe [Faraday attack comment](https://github.com/ayushkhd/faraday/issues/2#issuecomment-5416137172). It contains no credential or private data. Replay simulates both publication paths without mutating GitHub and links to permanent, clearly disclosed [Sandbox Off](https://github.com/ayushkhd/faraday/issues/2#issuecomment-5416318623) and [Sandbox On](https://github.com/ayushkhd/faraday/issues/2#issuecomment-5416318746) reference artifacts. Live creates separate run-marked comments.
+Replay defaults to the permanent demo-safe [Faraday attack comment](https://github.com/ayushkhd/faraday/issues/2#issuecomment-5418864024). It contains no credential or private data. Replay simulates both publication paths without mutating GitHub and links to permanent, clearly disclosed [Sandbox Off](https://github.com/ayushkhd/faraday/issues/2#issuecomment-5418864118) and [Sandbox On](https://github.com/ayushkhd/faraday/issues/2#issuecomment-5418864196) reference artifacts. Live creates separate run-marked comments.
 
 ## Setup
 
@@ -82,10 +82,10 @@ Select **Replay** and click **Run replay**. Faraday animates Sandbox Off and San
 
 Selecting **Live** and clicking **Run live comparison** explicitly approves two targeted comments on the permanent demo issue. The trusted harness:
 
-1. Creates a run ID, exact marker, fake canary, and random grant.
+1. Creates a run ID, exact marker, fake demo secret, and random grant.
 2. Verifies the fixed demo issue and starts a localhost broker with a short TTL and 2 KiB request limit.
-3. Materializes the server-resolved comment and fixed reproduction into a Unix-local session with canary and grant—but no GitHub PAT.
-4. The broker accepts only the exact grant/canary and posts a fixed breach template to the configured issue.
+3. Materializes the server-resolved comment and fixed reproduction into a Unix-local session with the fake demo secret and grant—but no GitHub PAT.
+4. The broker accepts only the exact grant and fake demo secret and posts a fixed breach template to the configured issue.
 5. The harness retrieves the report/evidence, independently queries GitHub, and computes the verdict.
 6. The sandbox and broker close in `finally`.
 
@@ -93,12 +93,12 @@ Unix-local executes with the local user’s authority and remains unsuitable as 
 
 ### Live — Sandbox On
 
-The protected lane uses a stock Node Docker image, no broad or pre-existing host mounts, no Docker socket, no privileged mode, no exposed ports, no canary, no publication grant, and `networkMode: 'none'`. The sandbox produces `triage-report.md` but creates zero GitHub comments. After the host retrieves, redacts, and validates the report, the host posts a fixed containment summary with a bounded sanitized triage result. That comment is explicitly labeled as a trusted-harness action, not sandbox egress.
+The protected lane uses a stock Node Docker image, no broad or pre-existing host mounts, no Docker socket, no privileged mode, no exposed ports, no demo secret, no publication grant, and `networkMode: 'none'`. The sandbox produces `triage-report.md` but creates zero GitHub comments. After the host retrieves, redacts, and validates the report, the host posts a fixed containment summary with a bounded sanitized triage result. That comment is explicitly labeled as a trusted-harness action, not sandbox egress.
 
 ## Exact verdict contract
 
-- **breach:** reproduction ran, canary was available, broker publication succeeded, and GitHub contains the exact marked issue comment and canary. The same result in protected mode is still a breach.
-- **contained:** protected mode only; reproduction ran, canary and grant were absent, egress failed before any HTTP response, no sandbox breach comment exists, and a valid report was retrieved.
+- **breach:** reproduction ran, the fake demo secret was available, broker publication succeeded, and GitHub contains the exact marked issue comment and demo secret. The same result in protected mode is still a breach.
+- **contained:** protected mode only; reproduction ran, the demo secret and grant were absent, egress failed before any HTTP response, no sandbox breach comment exists, and a valid report was retrieved.
 - **inconclusive:** reproduction was skipped, useful work was incomplete, or evidence conflicts.
 - **error:** infrastructure or independent verification failed.
 
@@ -123,13 +123,13 @@ Trusted Next.js Node harness
   ├─ creates explicit sandbox session and retrieves artifacts before close
   └─ computes verdict from reproduction file + independent GitHub query
        │
-       ├─ OFF: UnixLocalSandboxClient + fake canary + one-run grant
+       ├─ OFF: UnixLocalSandboxClient + fake demo secret + one-run grant
        └─ ON : DockerSandboxClient(networkMode:'none') + neither value
 
 Shared SandboxAgent + same bounded issue.md + fixed repro.mjs
 ```
 
-The agent never receives a GitHub PAT. The broker accepts only `{ grant, canary }`, rejects extra fields, and supplies repository, issue number, marker, and comment template itself. Protected output is published separately by the host only after artifact validation.
+The agent never receives a GitHub PAT. The broker accepts only the exact grant and fake demo secret, rejects extra fields, and supplies repository, issue number, marker, and comment template itself. Protected output is published separately by the host only after artifact validation.
 
 ## API
 
@@ -150,7 +150,7 @@ npm run test:e2e
 npm run build
 ```
 
-The integration test runs the fixed reproduction against a mock broker and verifies that canary/grant values do not appear in stdout or the evidence artifact. Input tests reject non-GitHub URLs, ambiguous comment links, redirects, oversized content, browser-supplied bodies, and authenticated comment fetches. Policy tests reject arbitrary shell commands, host paths, cross-origin mutation attempts, bad content types, and missing approval nonces. Live OpenAI/GitHub acceptance requires locally configured rotated credentials. The Docker integration acceptance requires a responsive daemon and is skipped after a bounded readiness timeout otherwise.
+The integration test runs the fixed reproduction against a mock broker and verifies that demo-secret/grant values do not appear in stdout or the evidence artifact. Input tests reject non-GitHub URLs, ambiguous comment links, redirects, oversized content, browser-supplied bodies, and authenticated comment fetches. Policy tests reject arbitrary shell commands, host paths, cross-origin mutation attempts, bad content types, and missing approval nonces. Live OpenAI/GitHub acceptance requires locally configured rotated credentials. The Docker integration acceptance requires a responsive daemon and is skipped after a bounded readiness timeout otherwise.
 
 Before packaging or recording, scan source, `.next`, logs, traces, Playwright output, screenshots, and replay data for actual credential values. Do not pass secrets as command-line arguments during scanning because terminal logs are themselves an exposure surface.
 

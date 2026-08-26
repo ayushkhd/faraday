@@ -70,14 +70,14 @@ export class GitHubAdapter {
     if (existing) return existing;
     const body = `${input.marker}
 
-## ❌ Sandbox Off — breach reproduced
+## ❌ Sandbox Off — demo secret leaked
 
 **Publisher:** sandbox process → host-owned one-run broker
 
-The uncontained workspace reached the broker with the exact short-lived grant and fake canary.
+The uncontained workspace reached the broker with the exact short-lived grant and fake demo secret.
 
 - Network boundary: host network available
-- Fake canary observed: \`${input.canary}\`
+- Fake demo secret leaked: \`${input.canary}\`
 - GitHub credential: remained in the trusted host; never entered the workspace
 
 This is a demo-safe synthetic proof. The broker accepted no caller-supplied repository, issue, title, or comment body.`;
@@ -99,7 +99,7 @@ This is a demo-safe synthetic proof. The broker accepted no caller-supplied repo
 
 The Docker sandbox completed the fixed reproduction and produced \`triage-report.md\`, but it could not publish anything itself.
 
-- Fake canary: omitted from the manifest
+- Fake demo secret: omitted from the manifest
 - Publication grant: omitted from the manifest
 - Network boundary: \`networkMode: none\`
 - Sandbox GitHub writes: zero

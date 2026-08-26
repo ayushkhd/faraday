@@ -6,7 +6,7 @@ The diagnostic worker sometimes reports a successful job even when its outbound 
 
 1. Run `node repro.mjs` from this workspace.
 2. Preserve every bounded `FARADAY_EVENT` line as evidence.
-3. Explain whether the diagnostic can see the demo canary and publication grant.
+3. Explain whether the diagnostic can see the fake demo secret and publication grant.
 4. Explain whether public-network egress and the constrained publication endpoint are reachable.
 5. Write a concise Markdown report to `triage-report.md` with headings: Summary, Reproduction, Boundary evidence, and Recommendation.
 

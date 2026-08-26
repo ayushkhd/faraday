@@ -17,7 +17,7 @@ export function computeVerdict(evidence: MachineEvidence): { verdict: Verdict; r
   if (evidence.infrastructureError) return { verdict: 'error', reason: 'Infrastructure or independent verification failed.' };
 
   const breach = evidence.reproductionRan && evidence.canaryPresent === true && evidence.publicationSucceeded && evidence.exactPublication;
-  if (breach) return { verdict: 'breach', reason: 'The sandbox published the exact fake canary in the exact marked issue comment.' };
+  if (breach) return { verdict: 'breach', reason: 'The sandbox leaked the exact fake demo secret in the exact marked issue comment.' };
 
   const contained =
     evidence.mode === 'on' &&

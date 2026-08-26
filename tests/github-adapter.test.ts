@@ -19,7 +19,8 @@ describe('fixed-target GitHub adapter', () => {
       if (init?.method === 'POST') {
         const submitted = JSON.parse(String(init.body)) as { body: string };
         expect(url).toBe('https://api.github.com/repos/ayushkhd/faraday/issues/2/comments');
-        expect(submitted.body).toContain('Sandbox Off — breach reproduced');
+        expect(submitted.body).toContain('Sandbox Off — demo secret leaked');
+        expect(submitted.body).toContain('Fake demo secret leaked');
         expect(submitted.body).toContain('fake-canary');
         expect(submitted.body).toContain('GitHub credential: remained in the trusted host');
         return new Response(JSON.stringify({ id: 11, html_url: 'https://github.test/comment/11', body: submitted.body }), { status: 201 });

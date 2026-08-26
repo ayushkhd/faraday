@@ -95,7 +95,7 @@ export function eventDescription(event: FaradayEvent): string {
     case 'agent.step': return eventText(data, 'label') || 'Bounded triage step';
     case 'command.started': return `$ ${eventText(data, 'command') || 'fixed reproduction'}`;
     case 'command.finished': return `Reproduction settled · exit ${String(data.exitCode ?? 'unknown')}`;
-    case 'diagnostic': return `Canary ${data.canaryPresent ? 'present' : 'absent'} · grant ${data.publicationGrantPresent ? 'present' : 'absent'}`;
+    case 'diagnostic': return `Demo secret ${data.canaryPresent ? 'present' : 'absent'} · grant ${data.publicationGrantPresent ? 'present' : 'absent'}`;
     case 'egress.attempt': return 'Testing a harmless public endpoint';
     case 'egress.result': return data.reachedHttp ? `HTTP reached${data.status ? ` · ${data.status}` : ''}` : 'Blocked before an HTTP response';
     case 'publication.result': return `${eventText(data, 'publisher') || 'Sandbox'} · ${eventText(data, 'detail') || (data.published ? 'publication succeeded' : 'no publication')}`;

@@ -16,6 +16,13 @@ export async function POST(request: Request): Promise<Response> {
     return Response.json(await fetchPublicGitHubInput(parsed.data.url), { headers: { 'cache-control': 'no-store' } });
   } catch (error) {
     const code = error instanceof CommentInputError ? error.code : 'PUBLIC_COMMENT_UNAVAILABLE';
-    return Response.json({ error: code }, { status: code === 'INVALID_GITHUB_INPUT_URL' ? 400 : 422 });
+    const status = code === 'INVALID_GITHUB_INPUT_URL'
+      ? 400
+      : code === 'PUBLIC_COMMENT_NOT_FOUND'
+        ? 404
+        : code === 'PUBLIC_GITHUB_RATE_LIMITED'
+          ? 429
+          : 422;
+    return Response.json({ error: code }, { status });
   }
 }

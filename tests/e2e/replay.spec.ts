@@ -11,16 +11,16 @@ test('Replay compares Sandbox Off and Sandbox On side by side', async ({ page })
   await expect(page.getByRole('link', { name: 'Open source comment' })).toHaveAttribute('href', /ayushkhd\/faraday\/issues\/2#issuecomment-/);
   await expect(page.getByRole('link', { name: 'Open permanent demo issue' })).toHaveAttribute('href', /ayushkhd\/faraday\/issues\/2$/);
   await page.getByRole('button', { name: /Run replay/i }).click();
-  await expect(page.getByRole('heading', { name: 'Breach reproduced' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Demo secret leaked' })).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Contained · work completed' })).toBeVisible();
-  await expect(page.getByText('SIMULATED CANARY')).toBeVisible();
+  await expect(page.getByText('SIMULATED SECRET LEAK')).toBeVisible();
   await expect(page.getByText('SIMULATED COMMENT')).toBeVisible();
   await expect(page.getByText('EGRESS DENIED')).toBeVisible();
   await expect(page.getByText('HARNESS POSTED RESULT')).toBeVisible();
   await expect(page.getByText('Sandbox → one-run broker → GitHub comment')).toBeVisible();
   await expect(page.getByText('Sandbox → local report → trusted harness → cleaned GitHub comment')).toBeVisible();
-  await expect(page.getByRole('link', { name: 'Open permanent Replay breach reference' })).toHaveAttribute('href', 'https://github.com/ayushkhd/faraday/issues/2#issuecomment-5416318623');
-  await expect(page.getByRole('link', { name: 'Open permanent cleaned Replay reference' })).toHaveAttribute('href', 'https://github.com/ayushkhd/faraday/issues/2#issuecomment-5416318746');
+  await expect(page.getByRole('link', { name: 'Open permanent Replay breach reference' })).toHaveAttribute('href', 'https://github.com/ayushkhd/faraday/issues/2#issuecomment-5418864118');
+  await expect(page.getByRole('link', { name: 'Open permanent cleaned Replay reference' })).toHaveAttribute('href', 'https://github.com/ayushkhd/faraday/issues/2#issuecomment-5418864196');
   await expect(page.locator('summary').filter({ hasText: 'triage-report.md' })).toHaveCount(2);
   await page.getByRole('button', { name: 'Reset comparison' }).click();
   await expect(page.getByText('Awaiting comparison')).toHaveCount(2);
@@ -33,7 +33,7 @@ test('comparison recovers after refresh without a stale Replay lock', async ({ p
   await expect(page.getByRole('heading', { name: 'Contained · work completed' })).toBeVisible();
   await page.reload();
   await page.getByRole('button', { name: /Run replay/i }).click();
-  await expect(page.getByRole('heading', { name: 'Breach reproduced' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Demo secret leaked' })).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Contained · work completed' })).toBeVisible();
 });
 

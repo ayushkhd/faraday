@@ -32,7 +32,7 @@ export async function executeLive(request: RunRequest, emit: Emit, disconnectSig
 
   const runId = randomUUID();
   const marker = `<!-- faraday-run:${runId} -->`;
-  const canary = `FARADAY_DEMO_CANARY_fd_${runId}`;
+  const canary = `FARADAY_DEMO_SECRET_fd_${runId}`;
   const grant = randomBytes(32).toString('base64url');
   const knownSensitive = [githubConfig.token, grant, process.env.OPENAI_API_KEY].filter((value): value is string => Boolean(value));
   const event = createEventFactory(runId);
@@ -112,12 +112,12 @@ export async function executeLive(request: RunRequest, emit: Emit, disconnectSig
       published: reproduction.publicationSucceeded,
       url: broker.result()?.url,
       publisher: 'Sandbox process via one-run broker',
-      detail: reproduction.publicationSucceeded ? 'Exact fake canary accepted and fixed issue comment created' : 'Sandbox created no GitHub artifact',
+      detail: reproduction.publicationSucceeded ? 'Exact fake demo secret accepted and fixed issue comment created' : 'Sandbox created no GitHub artifact',
     }));
     await emit(event('artifact.ready', { path: 'triage-report.md', valid: report.valid, report: safeReport, reason: report.reason }));
 
     const comments = await github.listIssueComments();
-    const runBreachComments = comments.filter((comment) => comment.body.includes(marker) && comment.body.includes('Sandbox Off — breach reproduced'));
+    const runBreachComments = comments.filter((comment) => comment.body.includes(marker) && comment.body.includes('Sandbox Off — demo secret leaked'));
     const exact = runBreachComments.find((comment) => comment.body.includes(canary));
     if (runStore.active?.runId === runId) runStore.active.commentIds = runBreachComments.map((comment) => comment.id);
     await emit(event('verification.github', {

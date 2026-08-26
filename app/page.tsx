@@ -10,8 +10,14 @@ import type { FaradayEvent, RunRequest } from '@/lib/faraday/events';
 
 async function responseError(response: Response, label: string): Promise<Error> {
   const payload = await response.json().catch(() => null) as { error?: unknown } | null;
-  const code = typeof payload?.error === 'string' ? ` (${payload.error})` : '';
-  return new Error(`${label} returned ${response.status}${code}.`);
+  const code = typeof payload?.error === 'string' ? payload.error : null;
+  if (code === 'PUBLIC_COMMENT_NOT_FOUND') {
+    return new Error('GitHub did not find that exact issue comment. It may have been deleted; paste its current permalink. (PUBLIC_COMMENT_NOT_FOUND)');
+  }
+  if (code === 'PUBLIC_GITHUB_RATE_LIMITED') {
+    return new Error('GitHub temporarily rate-limited the public comment lookup. Retry after the limit resets. (PUBLIC_GITHUB_RATE_LIMITED)');
+  }
+  return new Error(`${label} returned ${response.status}${code ? ` (${code})` : ''}.`);
 }
 
 async function runLane(request: RunRequest, csrfToken: string, dispatch: Dispatch<ExperienceAction>): Promise<string> {
@@ -166,8 +172,8 @@ export default function Home() {
 
       <section className="config-diff">
         <div><span className="diff-icon">≠</span><strong>Configuration diff <small>(only)</small></strong></div>
-        <p className="removed">− network: host<br />− canary + grant: present</p>
-        <p className="added">+ network: none<br />+ canary + grant: omitted</p>
+        <p className="removed">− network: host<br />− demo secret + grant: present</p>
+        <p className="added">+ network: none<br />+ demo secret + grant: omitted</p>
         <p>Off: sandbox reaches broker. On: sandbox has no egress; harness publishes only validated output.</p>
         {hasResults ? <button type="button" onClick={() => void resetComparison()} disabled={comparisonBusy}>{comparisonBusy ? 'Resetting…' : 'Reset comparison'}</button> : null}
       </section>
